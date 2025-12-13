@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db as cloudbaseDB } from '@/lib/database/cloudbase-client'
+import cloudbase from '@cloudbase/node-sdk'
 import * as jwt from 'jsonwebtoken'
 
 /**
@@ -64,10 +64,19 @@ export async function GET(req: NextRequest) {
 
     console.log('✅ 微信用户信息:', userInfo)
 
+    // 初始化CloudBase（服务端）
+    const app = cloudbase.init({
+      env: process.env.NEXT_PUBLIC_WECHAT_CLOUDBASE_ID!,
+      secretId: process.env.CLOUDBASE_SECRET_ID!,
+      secretKey: process.env.CLOUDBASE_SECRET_KEY!
+    })
+
+    const db = app.database()
+
     // 保存/更新用户信息到腾讯云数据库
     try {
       // 查询是否已存在
-      const existingUser = await cloudbaseDB
+      const existingUser = await db
         .collection('web_users')
         .where({
           _openid: openid,
@@ -96,7 +105,7 @@ export async function GET(req: NextRequest) {
         // 更新现有用户
         userId = existingUser.data[0]._id
         isPro = existingUser.data[0].pro || false // 保留原有会员状态
-        await cloudbaseDB
+        await db
           .collection('web_users')
           .doc(userId)
           .update(userData)
@@ -104,7 +113,7 @@ export async function GET(req: NextRequest) {
         console.log('✅ 更新微信用户成功:', userId, isPro ? '(会员)' : '(普通用户)')
       } else {
         // 创建新用户
-        const result = await cloudbaseDB
+        const result = await db
           .collection('web_users')
           .add({
             ...userData,
