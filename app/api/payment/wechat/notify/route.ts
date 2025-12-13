@@ -3,12 +3,6 @@ import { Wechatpay } from 'wechatpay-axios-plugin'
 import { createClient } from '@supabase/supabase-js'
 import { db as cloudbaseDB } from '@/lib/database/cloudbase-client'
 
-// 初始化Supabase客户端
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
-
 // 微信支付配置
 const wechatpayConfig = {
   mchid: process.env.WECHAT_PAY_MCH_ID!,
@@ -33,6 +27,11 @@ try {
  */
 export async function POST(req: NextRequest) {
   try {
+    // 初始化Supabase客户端
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    )
     if (!wechatpay) {
       console.error('❌ 微信支付未配置')
       return NextResponse.json(

@@ -2,12 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import * as AlipaySdk from 'alipay-sdk'
 import { createClient } from '@supabase/supabase-js'
 
-// Supabase 客户端
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co',
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder_key'
-)
-
 // 支付宝支付配置
 const alipayConfig = {
   appId: process.env.ALIPAY_APP_ID || '2021005199628151',
@@ -36,6 +30,11 @@ const USD_TO_CNY_RATE = 7.2
 
 export async function POST(req: NextRequest) {
   try {
+    // Supabase 客户端
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co',
+      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder_key'
+    )
     console.log('🔵 [Alipay] 开始创建支付订单...')
 
     // 检查支付宝配置
