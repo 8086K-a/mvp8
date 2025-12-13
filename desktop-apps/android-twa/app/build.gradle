@@ -1,0 +1,48 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.sitehub.app'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.sitehub.app"
+        minSdk 24
+        targetSdk 34
+        versionCode 1
+        versionName "1.0.0"
+
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    signingConfigs {
+        release {
+            // 从环境变量读取（CI构建时使用）
+            def keystoreFilePath = System.getenv("KEYSTORE_FILE") ?: "mornhub-release.keystore"
+            storeFile file(keystoreFilePath)
+            storePassword System.getenv("KEYSTORE_PASSWORD") ?: "mornhub2024"
+            keyAlias System.getenv("KEY_ALIAS") ?: "mornhub"
+            keyPassword System.getenv("KEY_PASSWORD") ?: "mornhub2024"
+        }
+    }
+
+    buildTypes {
+        release {
+            signingConfig signingConfigs.release
+            minifyEnabled false  // 关闭代码混淆，避免构建问题
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+}
+
+dependencies {
+    implementation 'androidx.browser:browser:1.7.0'
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'com.google.androidbrowserhelper:androidbrowserhelper:2.5.0'
+}
