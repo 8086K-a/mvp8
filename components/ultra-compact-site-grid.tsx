@@ -9,6 +9,15 @@ import { handleWebViewLink } from "@/lib/webview-utils"
 import React from "react"
 
 const UltraCompactSiteCard = React.memo(function UltraCompactSiteCard({ site, onRemove, favorites, onToggleFavorite, isDragDisabled }) {
+  // 安全检查
+  if (!site || !site.id) {
+    return null
+  }
+  
+  const safeFavorites = Array.isArray(favorites) ? favorites : []
+  const handleRemove = onRemove || (() => {})
+  const handleToggleFavorite = onToggleFavorite || (() => {})
+  
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: site.id })
 
   const style = {
@@ -59,12 +68,12 @@ const UltraCompactSiteCard = React.memo(function UltraCompactSiteCard({ site, on
           )}
 
           {/* Favorite indicator - 移动端触摸优化 */}
-          {favorites.includes(site.id) ? (
+          {safeFavorites.includes(site.id) ? (
             <div
               className="absolute -top-0.5 -left-0.5 cursor-pointer z-10 p-1.5 -m-1.5 touch-manipulation"
               onClick={(e) => {
                 e.stopPropagation()
-                onToggleFavorite(site.id)
+                handleToggleFavorite(site.id)
               }}
             >
               <Heart className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-red-500 fill-red-500 drop-shadow-sm active:scale-90 sm:hover:scale-110 transition-transform" />
@@ -74,7 +83,7 @@ const UltraCompactSiteCard = React.memo(function UltraCompactSiteCard({ site, on
               className="absolute -top-0.5 -left-0.5 opacity-0 sm:group-hover:opacity-100 transition-opacity cursor-pointer z-10 p-1.5 -m-1.5 touch-manipulation"
               onClick={(e) => {
                 e.stopPropagation()
-                onToggleFavorite(site.id)
+                handleToggleFavorite(site.id)
               }}
             >
               <Heart className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-white/40 hover:text-red-400 active:scale-90 sm:hover:scale-110 transition-all" />
@@ -96,12 +105,12 @@ const UltraCompactSiteCard = React.memo(function UltraCompactSiteCard({ site, on
           <ExternalLink className="w-4 h-4 mr-2" />
           Open in New Tab
         </ContextMenuItem>
-        <ContextMenuItem onClick={() => onToggleFavorite(site.id)} className="text-white hover:bg-slate-700">
-          <Heart className={`w-4 h-4 mr-2 ${favorites.includes(site.id) ? "fill-red-500 text-red-500" : ""}`} />
-          {favorites.includes(site.id) ? "Remove from Favorites" : "Add to Favorites"}
+        <ContextMenuItem onClick={() => handleToggleFavorite(site.id)} className="text-white hover:bg-slate-700">
+          <Heart className={`w-4 h-4 mr-2 ${safeFavorites.includes(site.id) ? "fill-red-500 text-red-500" : ""}`} />
+          {safeFavorites.includes(site.id) ? "Remove from Favorites" : "Add to Favorites"}
         </ContextMenuItem>
         {site.custom && (
-          <ContextMenuItem onClick={() => onRemove(site.id)} className="text-red-400 hover:bg-slate-700">
+          <ContextMenuItem onClick={() => handleRemove(site.id)} className="text-red-400 hover:bg-slate-700">
             <Trash2 className="w-4 h-4 mr-2" />
             Remove Site
           </ContextMenuItem>
@@ -111,28 +120,42 @@ const UltraCompactSiteCard = React.memo(function UltraCompactSiteCard({ site, on
   )
 })
 
+UltraCompactSiteCard.displayName = 'UltraCompactSiteCard'
+
 const UltraCompactSiteGrid = React.memo(function UltraCompactSiteGrid({ sites, onRemove, onReorder, onToggleFavorite, favorites = [] as string[], isDragDisabled = false }) {
   // 防止hydration mismatch：确保sites数组安全
   const safeSites = Array.isArray(sites) ? sites : []
+  const safeFavorites = Array.isArray(favorites) ? favorites : []
   
   // 始终渲染相同数量的组件结构，保持 Hook 调用一致性
   // 即使 sites 为空，也渲染一个最小结构来保持组件树的一致性
   const isEmpty = safeSites.length === 0
   
+  // 确保所有回调函数都存在
+  const handleRemove = onRemove || (() => {})
+  const handleToggleFavorite = onToggleFavorite || (() => {})
+  
   return (
-    <SortableContext items={safeSites.map((site) => site.id)} strategy={rectSortingStrategy}>
+    <SortableContext items={safeSites.map((site) => site?.id || '').filter(Boolean)} strategy={rectSortingStrategy}>
       <div className={`grid grid-cols-3 xs:grid-cols-5 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 xl:grid-cols-15 2xl:grid-cols-18 gap-2 sm:gap-2 ${isEmpty ? 'min-h-[100px]' : ''}`}>
-        {safeSites.map((site) => (
-          <UltraCompactSiteCard
-            key={site.id}
-            site={site}
-            onRemove={onRemove}
-            favorites={favorites}
-            onToggleFavorite={onToggleFavorite}
-            isDragDisabled={isDragDisabled}
-          />
-        ))}
+        {safeSites.map((site) => {
+          if (!site || !site.id) return null
+          return (
+            <UltraCompactSiteCard
+              key={site.id}
+              site={site}
+              onRemove={handleRemove}
+              favorites={safeFavorites}
+              onToggleFavorite={handleToggleFavorite}
+              isDragDisabled={isDragDisabled}
+            />
+          )
+        })}
       </div>
     </SortableContext>
   )
 })
+
+UltraCompactSiteGrid.displayName = 'UltraCompactSiteGrid'
+
+export { UltraCompactSiteGrid }

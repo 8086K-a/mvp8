@@ -681,6 +681,9 @@ export default function SiteHub() {
   // 性能优化：限制初始渲染站点数量，避免一次性渲染过多元素
   const MAX_INITIAL_SITES = 50
   const displayedSites = useMemo(() => {
+    if (!Array.isArray(filteredSites)) {
+      return []
+    }
     return filteredSites.slice(0, MAX_INITIAL_SITES)
   }, [filteredSites])
 
