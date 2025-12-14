@@ -650,21 +650,23 @@ export default function SiteHub() {
     if (!isHydrated) {
       return []
     }
-    
+
     let filtered = sites.filter((site) => !site.featured)
 
     // Apply search filter
     if (searchQuery) {
+      const query = searchQuery.toLowerCase()
       filtered = filtered.filter(
         (site) =>
-          site.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          site.category.toLowerCase().includes(searchQuery.toLowerCase()),
+          site.name.toLowerCase().includes(query) ||
+          site.category.toLowerCase().includes(query),
       )
     }
 
     // Apply category filter
     if (selectedCategory === "favorites") {
-      filtered = filtered.filter((site) => favorites.includes(site.id))
+      const favoriteSet = new Set(favorites)
+      filtered = filtered.filter((site) => favoriteSet.has(site.id))
     } else if (selectedCategory === "custom") {
       filtered = filtered.filter((site) => site.custom === true)
     } else if (selectedCategory === "china") {
@@ -674,7 +676,13 @@ export default function SiteHub() {
     }
 
     return filtered
-  }, [sites, searchQuery, selectedCategory, favorites, isHydrated])
+  }, [sites.length, sites, searchQuery, selectedCategory, favorites.length, favorites, isHydrated])
+
+  // 性能优化：限制初始渲染站点数量，避免一次性渲染过多元素
+  const MAX_INITIAL_SITES = 50
+  const displayedSites = useMemo(() => {
+    return filteredSites.slice(0, MAX_INITIAL_SITES)
+  }, [filteredSites])
 
   const nonFeaturedCount = useMemo(() => {
     // 防止hydration mismatch：只在客户端渲染完成后处理sites
@@ -1260,7 +1268,7 @@ export default function SiteHub() {
         </div>
 
         <UltraCompactSiteGrid
-          sites={filteredSites}
+          sites={displayedSites}
           onRemove={removeSite}
           onReorder={handleReorder}
           onToggleFavorite={toggleFavorite}

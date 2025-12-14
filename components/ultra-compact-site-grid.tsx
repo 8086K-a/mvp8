@@ -6,8 +6,9 @@ import { CSS } from "@dnd-kit/utilities"
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "@/components/ui/context-menu"
 import { Heart, Trash2, ExternalLink, GripVertical } from "lucide-react"
 import { handleWebViewLink } from "@/lib/webview-utils"
+import React from "react"
 
-function UltraCompactSiteCard({ site, onRemove, favorites, onToggleFavorite, isDragDisabled }) {
+const UltraCompactSiteCard = React.memo(function UltraCompactSiteCard({ site, onRemove, favorites, onToggleFavorite, isDragDisabled }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: site.id })
 
   const style = {
@@ -34,8 +35,8 @@ function UltraCompactSiteCard({ site, onRemove, favorites, onToggleFavorite, isD
           {...(isDragDisabled ? {} : { ...attributes, ...listeners })}
           data-site-card="true"
           data-site-url={site.url}
-          className={`group relative ${isDragDisabled ? "cursor-pointer" : "cursor-grab active:cursor-grabbing"} p-1.5 sm:p-2 bg-white/8 backdrop-blur-sm rounded-md border border-white/10 hover:border-blue-400/50 hover:bg-white/15 transition-all duration-200 hover:shadow-[0_0_8px_rgba(59,130,246,0.3)] active:scale-95 sm:hover:scale-105 touch-manipulation min-h-[60px] sm:min-h-[70px] ${
-            isDragging ? "shadow-lg border-blue-500 bg-white/20 scale-110" : ""
+          className={`group relative ${isDragDisabled ? "cursor-pointer" : "cursor-grab active:cursor-grabbing"} p-1.5 sm:p-2 bg-white/8 backdrop-blur-sm rounded-md border border-white/10 hover:border-blue-400/50 hover:bg-white/15 transition-colors duration-150 touch-manipulation min-h-[60px] sm:min-h-[70px] ${
+            isDragging ? "shadow-lg border-blue-500 bg-white/20" : ""
           } ${isDragDisabled ? "opacity-60" : ""}`}
         >
           {/* Drag indicator - 移动端隐藏 */}
@@ -46,7 +47,7 @@ function UltraCompactSiteCard({ site, onRemove, favorites, onToggleFavorite, isD
           )}
 
           <div onClick={(e) => handleSiteClick(e, site.url)} className="relative text-center space-y-0.5 sm:space-y-1">
-            <div className="text-base sm:text-lg group-hover:scale-110 transition-transform duration-200">{site.logo}</div>
+            <div className="text-base sm:text-lg">{site.logo}</div>
             <div className="text-[10px] sm:text-xs text-white/80 group-hover:text-white font-medium truncate leading-tight px-0.5">
               {site.name}
             </div>
@@ -108,9 +109,9 @@ function UltraCompactSiteCard({ site, onRemove, favorites, onToggleFavorite, isD
       </ContextMenuContent>
     </ContextMenu>
   )
-}
+})
 
-export function UltraCompactSiteGrid({ sites, onRemove, onReorder, onToggleFavorite, favorites = [] as string[], isDragDisabled = false }) {
+const UltraCompactSiteGrid = React.memo(function UltraCompactSiteGrid({ sites, onRemove, onReorder, onToggleFavorite, favorites = [] as string[], isDragDisabled = false }) {
   // 防止hydration mismatch：确保sites数组安全
   const safeSites = Array.isArray(sites) ? sites : []
   
@@ -134,4 +135,4 @@ export function UltraCompactSiteGrid({ sites, onRemove, onReorder, onToggleFavor
       </div>
     </SortableContext>
   )
-}
+})
