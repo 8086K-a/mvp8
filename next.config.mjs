@@ -22,8 +22,6 @@ const nextConfig = {
     ],
     // 启用SWC编译优化
     swcMinify: true,
-    // 启用更快的CSS处理
-    optimizeCss: true,
   },
   // 启用代码分割优化 - 减少包大小
   modularizeImports: {
