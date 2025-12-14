@@ -4,23 +4,23 @@ import { createClient } from '@supabase/supabase-js'
 
 export async function POST(req: NextRequest) {
   try {
-    // 初始化PayPal客户端
-    const client = new Client({
-      clientCredentialsAuthCredentials: {
-        oAuthClientId: process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID!,
-        oAuthClientSecret: process.env.PAYPAL_CLIENT_SECRET!,
-      },
-      environment: process.env.PAYPAL_MODE === 'production'
-        ? Environment.Production
-        : Environment.Sandbox,
-    })
+// 初始化PayPal客户端
+const client = new Client({
+  clientCredentialsAuthCredentials: {
+    oAuthClientId: process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID!,
+    oAuthClientSecret: process.env.PAYPAL_CLIENT_SECRET!,
+  },
+  environment: process.env.PAYPAL_MODE === 'production'
+    ? Environment.Production
+    : Environment.Sandbox,
+})
 
-    const ordersController = new OrdersController(client)
+const ordersController = new OrdersController(client)
 
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    )
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 
     const { orderId, planType, userEmail, billingCycle } = await req.json()
 

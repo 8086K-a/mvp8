@@ -3,19 +3,19 @@ import { createClient } from '@supabase/supabase-js'
 
 export async function POST(request: NextRequest) {
   try {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL!
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL!
 
-    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      auth: {
-        autoRefreshToken: true,
-        persistSession: true,
-        detectSessionInUrl: true,
-        storageKey: 'sitehub-auth-token',
-        flowType: 'pkce'
-      }
-    })
+const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: true,
+    storageKey: 'sitehub-auth-token',
+    flowType: 'pkce'
+  }
+})
 
     console.log('🔍 Testing Google OAuth configuration...')
     console.log(`Supabase URL: ${supabaseUrl}`)

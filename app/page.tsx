@@ -8,8 +8,8 @@
 
 "use client"
 
-// Force client-side rendering to avoid SSR hydration mismatch
-export const dynamic = 'force-dynamic'
+// 完全客户端渲染，避免服务器端性能问题
+// 注意：如果遇到 hydration mismatch，请检查组件中的服务端/客户端不一致问题
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react"
 import { Header } from "@/components/header"
@@ -304,10 +304,18 @@ export default function SiteHub() {
   const text = homeUiText[language]
   const toastText = text.toasts
 
-  const [sites, setSites] = useState<Site[]>([])
+  // 存储原始站点数据（未处理）
+  const [rawSites, setRawSites] = useState<Site[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedCategory, setSelectedCategory] = useState("all")
   const [categoryInitialized, setCategoryInitialized] = useState(false)
+  
+  // ✅ 性能优化：使用 useMemo 缓存处理后的站点数据，避免重复计算
+  const sites = useMemo(() => {
+    if (rawSites.length === 0) return []
+    const prioritized = prioritizeSitesByRegion(rawSites, regionCategory)
+    return localizeSites(prioritized, language)
+  }, [rawSites, regionCategory, language])
   const [isShuffled, setIsShuffled] = useState(false)
   const [showAddModal, setShowAddModal] = useState(false)
   const [showParseModal, setShowParseModal] = useState(false)
@@ -317,7 +325,7 @@ export default function SiteHub() {
   const [toast, setToast] = useState<any>(null)
   const [isGuestTimeExpired, setIsGuestTimeExpired] = useState(false)
   const [favorites, setFavorites] = useState<string[]>([])
-  const [regionPriorityApplied, setRegionPriorityApplied] = useState(false)
+  // ✅ 性能优化：移除了 regionPriorityApplied，因为数据处理现在由 useMemo 自动完成
   const [draggingSiteId, setDraggingSiteId] = useState<string | null>(null)
   const [dbAdapter, setDbAdapter] = useState<IDatabaseAdapter | null>(null)
   const [mounted, setMounted] = useState(false)
@@ -375,9 +383,7 @@ export default function SiteHub() {
     setMounted(true)
   }, [])
 
-  useEffect(() => {
-    setRegionPriorityApplied(false)
-  }, [regionCategory])
+  // ✅ 性能优化：移除了 regionPriorityApplied 的 useEffect，因为数据处理现在由 useMemo 自动完成
 
   useEffect(() => {
     if (categoryInitialized || geoLoading) {
@@ -478,7 +484,8 @@ export default function SiteHub() {
           const defaultSites = getDefaultSites()
           const mergedSites = [...defaultSites, ...customSites]
           const normalizedSites = normalizeSites(mergedSites)
-          setSites(localizeSites(prioritizeSitesByRegion(normalizedSites, regionCategory), language))
+          // ✅ 性能优化：只设置原始数据，处理由 useMemo 自动完成
+          setRawSites(normalizedSites)
 
           // ✅ 性能优化：异步迁移 localStorage 数据，不阻塞主渲染
           if (isHydrated && typeof window !== 'undefined') {
@@ -537,17 +544,20 @@ export default function SiteHub() {
             try {
               const parsedSites = JSON.parse(savedSites)
               const normalizedSites = normalizeSites(parsedSites)
-              setSites(localizeSites(prioritizeSitesByRegion(normalizedSites, regionCategory), language))
+              // ✅ 性能优化：只设置原始数据，处理由 useMemo 自动完成
+              setRawSites(normalizedSites)
             } catch (error) {
               console.error('❌ [LocalStorage] 解析自定义网站失败:', error)
             }
           } else {
             const defaultSites = getDefaultSites()
-            setSites(localizeSites(prioritizeSitesByRegion(defaultSites, regionCategory), language))
+            // ✅ 性能优化：只设置原始数据，处理由 useMemo 自动完成
+            setRawSites(defaultSites)
           }
         } else {
           const defaultSites = getDefaultSites()
-          setSites(localizeSites(prioritizeSitesByRegion(defaultSites, regionCategory), language))
+          // ✅ 性能优化：只设置原始数据，处理由 useMemo 自动完成
+          setRawSites(defaultSites)
         }
       }
     }
@@ -582,35 +592,9 @@ export default function SiteHub() {
     }
   }, [authLoading, geoLoading, user.type, user.id, dbAdapter, isChina, isHydrated, regionCategory, language])
 
-  useEffect(() => {
-    if (geoLoading) {
-      return
-    }
-    if (regionPriorityApplied) {
-      return
-    }
-    if (sites.length === 0) {
-      return
-    }
-
-    const prioritized = prioritizeSitesByRegion(sites, regionCategory)
-    if (!areSiteOrdersEqual(sites, prioritized)) {
-      const localizedPrioritized = localizeSites(prioritized, language)
-      setSites(localizedPrioritized)
-      if (isHydrated && typeof window !== 'undefined') {
-        try {
-          localStorage.setItem("sitehub-sites", JSON.stringify(localizedPrioritized))
-        } catch (error) {
-          console.warn("Failed to persist regional ordering:", error)
-        }
-      }
-    }
-    setRegionPriorityApplied(true)
-  }, [geoLoading, regionPriorityApplied, sites, regionCategory, language])
-
-  useEffect(() => {
-    setSites((prev) => localizeSites(prev, language))
-  }, [language])
+  // ✅ 性能优化：移除重复的数据处理 useEffect
+  // 现在数据处理由 useMemo 自动完成，当 regionCategory 或 language 变化时会自动重新计算
+  // 保存到 localStorage 的逻辑移到 sites useMemo 的副作用中（如果需要）
 
   // Save data with user-specific keys for authenticated users
   const saveUserData = (key: string, data: any) => {
@@ -678,13 +662,12 @@ export default function SiteHub() {
     return filtered
   }, [sites.length, sites, searchQuery, selectedCategory, favorites.length, favorites, isHydrated])
 
-  // 性能优化：限制初始渲染站点数量，避免一次性渲染过多元素
-  const MAX_INITIAL_SITES = 50
+  // 使用所有过滤后的站点（移除数量限制以显示全部站点）
   const displayedSites = useMemo(() => {
     if (!Array.isArray(filteredSites)) {
       return []
     }
-    return filteredSites.slice(0, MAX_INITIAL_SITES)
+    return filteredSites
   }, [filteredSites])
 
   const nonFeaturedCount = useMemo(() => {
@@ -767,6 +750,8 @@ export default function SiteHub() {
   const shuffleSites = useCallback(() => {
     console.log('🔍 [Shuffle] 开始随机排序网站')
 
+    // ✅ 性能优化：从处理后的 sites 中提取对应的 rawSites
+    // 因为 shuffle 应该基于用户看到的顺序
     const featuredSites = sites.filter((site) => site.featured)
     const regularSites = sites.filter((site) => !site.featured)
 
@@ -777,13 +762,19 @@ export default function SiteHub() {
       ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
     }
 
-    const newSites = [...featuredSites, ...shuffled]
-    setSites(newSites)
+    // 从处理后的 sites 中找到对应的 rawSites
+    const shuffledRawSites = featuredSites
+      .map(processedSite => rawSites.find(s => s.id === processedSite.id) || processedSite)
+      .concat(
+        shuffled.map(processedSite => rawSites.find(s => s.id === processedSite.id) || processedSite)
+      )
+    
+    setRawSites(shuffledRawSites)
     setIsShuffled(!isShuffled)
 
     if (isHydrated && typeof window !== 'undefined') {
       try {
-        localStorage.setItem("webhub-sites", JSON.stringify(newSites))
+        localStorage.setItem("webhub-sites", JSON.stringify(shuffledRawSites))
         localStorage.setItem("webhub-shuffle", JSON.stringify(!isShuffled))
       } catch (error) {
         console.error('❌ [LocalStorage] 保存随机状态失败:', error)
@@ -791,7 +782,7 @@ export default function SiteHub() {
     }
 
     showToast(toastText.shuffled)
-  }, [sites, isHydrated, showToast, toastText])
+  }, [sites, rawSites, isHydrated, showToast, toastText, isShuffled])
 
   const handleReorder = useCallback((newSites: Site[]) => {
     if (user.type === "guest" && isGuestTimeExpired) {
@@ -799,9 +790,16 @@ export default function SiteHub() {
       return
     }
 
-    const featuredSites = sites.filter((site) => site.featured)
-    const reorderedSites = [...featuredSites, ...newSites]
-    setSites(reorderedSites)
+    // ✅ 性能优化：从处理后的 sites 中提取原始数据
+    // newSites 是处理后的数据，需要通过 id 匹配找到对应的原始数据
+    const featuredSites = rawSites.filter((site) => site.featured)
+    const reorderedRawSites = featuredSites.concat(
+      newSites.map(processedSite => {
+        const rawSite = rawSites.find(s => s.id === processedSite.id)
+        return rawSite || processedSite
+      })
+    )
+    setRawSites(reorderedRawSites)
     if (isHydrated && typeof window !== 'undefined') {
       try {
         localStorage.setItem("sitehub-sites", JSON.stringify(reorderedSites))
@@ -810,7 +808,7 @@ export default function SiteHub() {
       }
     }
     showToast(toastText.reordered)
-  }, [user.type, isGuestTimeExpired, sites, isHydrated, showToast, toastText])
+  }, [user.type, isGuestTimeExpired, rawSites, isHydrated, showToast, toastText])
 
   const addCustomSite = useCallback(async (newSite: any): Promise<boolean> => {
     console.log('🔍 [AddSite] 开始添加网站:', newSite)
@@ -914,7 +912,8 @@ export default function SiteHub() {
         isChina: false,
       }
 
-      setSites((prev) => {
+      // ✅ 性能优化：直接设置原始数据
+      setRawSites((prev) => {
         const updated = [...prev, siteWithId]
         if (isHydrated && typeof window !== 'undefined') {
           try {
@@ -1063,13 +1062,15 @@ export default function SiteHub() {
         setFavorites(favorites.filter((id) => id !== siteId))
       }
 
-      setSites(sites.filter((site) => site.id !== siteId))
+      // ✅ 性能优化：直接操作原始数据
+      setRawSites(rawSites.filter((site) => site.id !== siteId))
       showToast(toastText.removed)
       console.log('✅ [DB] 删除自定义网站成功')
     } else {
       // Guest users: use localStorage
-      const updatedSites = sites.filter((site) => site.id !== siteId)
-      setSites(updatedSites)
+      // ✅ 性能优化：直接操作原始数据
+      const updatedSites = rawSites.filter((site) => site.id !== siteId)
+      setRawSites(updatedSites)
 
       if (favorites.includes(siteId)) {
         const newFavorites = favorites.filter((id) => id !== siteId)
@@ -1092,7 +1093,7 @@ export default function SiteHub() {
       }
       showToast(toastText.removed)
     }
-  }, [user.type, user.id, dbAdapter, favorites, sites, isHydrated, showToast, toastText])
+  }, [user.type, user.id, dbAdapter, favorites, rawSites, isHydrated, showToast, toastText])
 
   // ✅ 关键修复：所有模态框回调函数都用 useCallback 包装
   const handleCloseAddModal = useCallback(() => setShowAddModal(false), [])

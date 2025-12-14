@@ -66,19 +66,56 @@ export async function POST(req: NextRequest) {
       trade_no, // 支付宝交易号
       trade_status, // 交易状态
       total_amount, // 订单金额
-      buyer_email, // 买家邮箱
+      passback_params, // ✅ 从 passback_params 获取用户邮箱（创建订单时传递）
     } = params
+    
+    // 从 passback_params 提取 userEmail（如果存在）
+    const userEmail = passback_params || ''
 
     // 更新数据库订单状态
     if (trade_status === 'TRADE_SUCCESS' || trade_status === 'TRADE_FINISHED') {
       console.log('💰 [Alipay Notify] 支付成功，更新订单状态')
 
-      // 更新订单状态为已支付
+      // 查询订单信息（使用商户订单号 out_trade_no）
+      const { data: transaction, error: queryError } = await supabase
+        .from('web_payment_transactions')
+        .select('*')
+        .eq('transaction_id', out_trade_no)
+        .single()
+
+      if (queryError || !transaction) {
+        console.error('❌ [Alipay Notify] 未找到订单记录:', out_trade_no)
+        // 即使找不到订单，也返回 success 给支付宝，避免重复通知
+        return new NextResponse('success', {
+          status: 200,
+          headers: { 'Content-Type': 'text/plain' },
+        })
+      }
+
+      console.log('📦 [Alipay Notify] 订单信息:', {
+        email: transaction.user_email,
+        plan: transaction.plan_type,
+        cycle: transaction.billing_cycle,
+      })
+
+      // 使用 passback_params 中的 userEmail，如果没有则使用订单中的 user_email
+      const finalUserEmail = userEmail || transaction.user_email
+
+      if (!finalUserEmail) {
+        console.error('❌ [Alipay Notify] 无法获取用户邮箱')
+        return new NextResponse('success', {
+          status: 200,
+          headers: { 'Content-Type': 'text/plain' },
+        })
+      }
+
+      // 更新订单状态为已支付（使用正确的表名和字段）
       const { error: updateError } = await supabase
-        .from('payment_transactions')
+        .from('web_payment_transactions')
         .update({
-          status: 'completed',
+          payment_status: 'completed',
           transaction_id: trade_no, // 更新为支付宝交易号
+          alipay_trade_no: trade_no, // 保存支付宝交易号
           updated_at: new Date().toISOString(),
         })
         .eq('transaction_id', out_trade_no)
@@ -90,62 +127,84 @@ export async function POST(req: NextRequest) {
         console.log('✅ [Alipay Notify] 订单状态已更新为 completed')
       }
 
-      // 查询订单信息以更新用户订阅状态
-      const { data: transaction, error: queryError } = await supabase
-        .from('payment_transactions')
-        .select('*')
-        .eq('transaction_id', trade_no)
-        .single()
+      // 计算订阅到期时间
+      const now = new Date()
+      const expireTime = new Date(now)
+      if (transaction.billing_cycle === 'monthly') {
+        expireTime.setMonth(expireTime.getMonth() + 1)
+      } else {
+        expireTime.setFullYear(expireTime.getFullYear() + 1)
+      }
 
-      if (!queryError && transaction) {
-        console.log('📦 [Alipay Notify] 订单信息:', {
-          email: transaction.user_email,
-          plan: transaction.plan_type,
-          cycle: transaction.billing_cycle,
-        })
+      console.log('📅 Alipay subscription period:', {
+        planType: transaction.plan_type,
+        billingCycle: transaction.billing_cycle,
+        startTime: now.toISOString(),
+        expireTime: expireTime.toISOString()
+      })
 
-        // 计算订阅到期时间
-        const startDate = new Date()
-        const endDate = new Date()
-        if (transaction.billing_cycle === 'monthly') {
-          endDate.setMonth(endDate.getMonth() + 1)
-        } else {
-          endDate.setFullYear(endDate.getFullYear() + 1)
-        }
+      // 更新或创建用户订阅（使用正确的表名和字段，参考 Stripe 实现）
+      const { data: subscriptionRows, error: subError } = await supabase.from('web_subscriptions').upsert({
+        user_email: finalUserEmail,
+        platform: 'web',
+        payment_method: 'alipay',
+        plan_type: transaction.plan_type,
+        billing_cycle: transaction.billing_cycle,
+        status: 'active',
+        start_time: now.toISOString(),
+        expire_time: expireTime.toISOString(),
+        alipay_trade_no: trade_no,
+        auto_renew: false,
+        next_billing_date: expireTime.toISOString(),
+        updated_at: now.toISOString(),
+      }, {
+        onConflict: 'user_email'
+      }).select().maybeSingle()
 
-        // 更新或创建用户订阅
-        const { error: subscriptionError } = await supabase
-          .from('subscriptions')
-          .upsert(
+      if (subError) {
+        console.error('❌ [Alipay Notify] 订阅更新失败:', subError)
+      } else {
+        console.log('✅ [Alipay Notify] 用户订阅已激活')
+      }
+
+      // 更新用户的 pro 状态（参考 Stripe 实现）
+      try {
+        const { data: userData, error: userError } = await supabase.auth.admin.listUsers()
+        const user = userData?.users.find(u => u.email === finalUserEmail)
+
+        if (user) {
+          const { error: updateError } = await supabase.auth.admin.updateUserById(
+            user.id,
             {
-              user_email: transaction.user_email,
-              plan_type: transaction.plan_type,
-              status: 'active',
-              current_period_start: startDate.toISOString(),
-              current_period_end: endDate.toISOString(),
-              cancel_at_period_end: false,
-              payment_method: 'alipay',
-              updated_at: new Date().toISOString(),
-            },
-            {
-              onConflict: 'user_email',
+              user_metadata: {
+                ...user.user_metadata,
+                pro: true,
+                upgraded_at: now.toISOString()
+              }
             }
           )
 
-        if (subscriptionError) {
-          console.error('❌ [Alipay Notify] 订阅更新失败:', subscriptionError)
+          if (updateError) {
+            console.error('Failed to update user pro status:', updateError)
+          } else {
+            console.log('✅ User pro status updated:', finalUserEmail)
+          }
         } else {
-          console.log('✅ [Alipay Notify] 用户订阅已激活')
+          console.warn('⚠️ User not found in auth.users:', finalUserEmail)
         }
+      } catch (error) {
+        console.error('Error updating user pro status:', error)
+        // 不返回错误，因为订阅已经创建成功
       }
+
     } else if (trade_status === 'TRADE_CLOSED') {
       console.log('⚠️ [Alipay Notify] 交易已关闭')
 
-      // 更新订单状态为已关闭
+      // 更新订单状态为已关闭（使用正确的表名和字段）
       await supabase
-        .from('payment_transactions')
+        .from('web_payment_transactions')
         .update({
-          status: 'cancelled',
+          payment_status: 'cancelled',
           updated_at: new Date().toISOString(),
         })
         .eq('transaction_id', out_trade_no)

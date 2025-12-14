@@ -108,6 +108,7 @@ export async function POST(req: NextRequest) {
         total_amount: amountCNY,
         subject: subject,
         body: body_text,
+        passback_params: userEmail, // ✅ 传递用户邮箱，用于 webhook 识别用户
       },
       returnUrl: `${process.env.NEXT_PUBLIC_SITE_URL}/payment/success?session_id=${outTradeNo}`,
       notifyUrl: `${process.env.NEXT_PUBLIC_SITE_URL}/api/payment/alipay/notify`,
@@ -123,17 +124,33 @@ export async function POST(req: NextRequest) {
 
     console.log('✅ [Alipay] 支付链接生成成功')
 
-    // 保存订单到数据库
-    const { error: dbError } = await supabase.from('payment_transactions').insert({
+    // 保存订单到数据库（使用正确的表名和字段）
+    const amountInCents = Math.round(parseFloat(amountCNY) * 100) // 转换为分
+    const paymentFee = Math.round(amountInCents * 0.006) // 支付宝手续费约 0.6%
+    const netAmount = amountInCents - paymentFee
+    
+    const { error: dbError } = await supabase.from('web_payment_transactions').insert({
       user_email: userEmail,
+      product_name: 'sitehub',
       plan_type: planType,
       billing_cycle: billingCycle,
-      amount_usd: amountUSD,
-      amount_cny: parseFloat(amountCNY),
       payment_method: 'alipay',
+      payment_status: 'pending',
+      transaction_type: 'purchase',
+      currency: 'CNY',
+      gross_amount: amountInCents,
+      payment_fee: paymentFee,
+      net_amount: netAmount,
+      service_cost: 0,
+      profit: netAmount,
       transaction_id: outTradeNo,
-      status: 'pending',
-      created_at: new Date().toISOString(),
+      payment_time: new Date().toISOString(),
+      metadata: {
+        planType,
+        billingCycle,
+        amountUSD,
+        amountCNY: parseFloat(amountCNY),
+      },
     })
 
     if (dbError) {
