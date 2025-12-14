@@ -9,6 +9,10 @@ import {
   type Language
 } from '@/lib/ip-detection'
 
+// 内存缓存，避免重复请求相同的IP
+const geoCache = new Map<string, { data: GeoLocation; timestamp: number }>()
+const CACHE_DURATION = 1000 * 60 * 30 // 30分钟缓存
+
 /**
  * IP 地理位置检测 API (升级版)
  *
@@ -82,6 +86,20 @@ export async function GET(request: NextRequest) {
       })
     }
 
+    // 检查缓存
+    const now = Date.now()
+    const cached = geoCache.get(clientIP)
+    if (cached && (now - cached.timestamp) < CACHE_DURATION) {
+      console.log(`✅ [Geo] 使用缓存数据 for IP: ${clientIP}`)
+      return NextResponse.json({
+        success: true,
+        data: cached.data,
+        cached: true
+      })
+    }
+
+    console.log(`🌍 [Geo] 请求新的地理位置数据 for IP: ${clientIP}`)
+
     // 调用 ip-api.com 获取地理位置信息
     const response = await fetch(`http://ip-api.com/json/${clientIP}?fields=status,message,country,countryCode,region,regionName,city,timezone,query`, {
       headers: {
@@ -127,9 +145,23 @@ export async function GET(request: NextRequest) {
       isEurope: isEurope
     }
 
+    // 存入缓存
+    geoCache.set(clientIP, { data: geoLocation, timestamp: now })
+
+    // 清理过期缓存
+    if (geoCache.size > 1000) { // 防止内存泄漏
+      const cutoff = now - CACHE_DURATION
+      for (const [ip, entry] of geoCache.entries()) {
+        if (entry.timestamp < cutoff) {
+          geoCache.delete(ip)
+        }
+      }
+    }
+
     return NextResponse.json({
       success: true,
-      data: geoLocation
+      data: geoLocation,
+      cached: false
     })
 
   } catch (error) {

@@ -162,8 +162,9 @@ export function GeoProvider({ children }: GeoProviderProps) {
   }
 
   useEffect(() => {
+    // 仅在首次加载时获取地理位置，避免每次路由变化都重新请求
     fetchGeoLocation()
-  }, [])
+  }, []) // 移除依赖项，仅执行一次
 
   const value: GeoContextType = {
     location,

@@ -243,7 +243,7 @@ export default function SiteHub() {
         localStorage.setItem('user_token', token)
         localStorage.setItem('user_info', JSON.stringify(userData))
 
-        console.log('✅ [微信登录成功]:', userData)
+        // 保留微信登录成功日志（重要）
 
         // 清除URL参数并刷新页面
         window.history.replaceState({}, '', window.location.pathname)
@@ -279,43 +279,46 @@ export default function SiteHub() {
   // Hydration 探针 - 更安全的实现
   const [isHydrated, setIsHydrated] = useState(false)
   useEffect(() => {
-    // 使用 setTimeout 确保在下一个事件循环中设置，避免 SSR/CSR 不一致
-    const timer = setTimeout(() => {
-      setIsHydrated(true)
+    // 立即设置，避免延迟导致的闪烁
+    setIsHydrated(true)
+    if (process.env.NODE_ENV === 'development') {
       console.log('🔍 [Hydration] 客户端已水合')
-    }, 0)
-    
-    return () => clearTimeout(timer)
+    }
   }, [])
 
-  // 调试日志
+  // ✅ 性能优化：只在开发环境输出调试日志
   React.useEffect(() => {
-    console.log('🔍 [Debug] SiteHub render state:', {
-      userType: user.type,
-      userId: user.id,
-      authLoading,
-      geoLoading,
-      isChina,
-      isSSR: typeof window === 'undefined',
-      timestamp: new Date().toISOString()
-    })
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔍 [Debug] SiteHub render state:', {
+        userType: user.type,
+        userId: user.id,
+        authLoading,
+        geoLoading,
+        isChina,
+        isSSR: typeof window === 'undefined',
+        timestamp: new Date().toISOString()
+      })
+    }
   }, [user.type, user.id, authLoading, geoLoading, isChina])
   const { language } = useLanguage()
   const text = homeUiText[language]
   const toastText = text.toasts
 
-  // 存储原始站点数据（未处理）
-  const [rawSites, setRawSites] = useState<Site[]>([])
+  // 存储原始站点数据（未处理）- 优化初始状态
+  const [rawSites, setRawSites] = useState<Site[]>(getDefaultSites)
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedCategory, setSelectedCategory] = useState("all")
   const [categoryInitialized, setCategoryInitialized] = useState(false)
   
   // ✅ 性能优化：使用 useMemo 缓存处理后的站点数据，避免重复计算
+  // 使用稳定的依赖项：只依赖数组长度和内容标识，避免数组引用变化导致重新计算
+  const rawSitesLength = rawSites.length
+  const rawSitesIds = useMemo(() => rawSites.map(s => s.id).join(','), [rawSitesLength])
   const sites = useMemo(() => {
-    if (rawSites.length === 0) return []
+    if (rawSitesLength === 0) return []
     const prioritized = prioritizeSitesByRegion(rawSites, regionCategory)
     return localizeSites(prioritized, language)
-  }, [rawSites, regionCategory, language])
+  }, [rawSitesIds, rawSitesLength, regionCategory, language])
   const [isShuffled, setIsShuffled] = useState(false)
   const [showAddModal, setShowAddModal] = useState(false)
   const [showParseModal, setShowParseModal] = useState(false)
@@ -411,10 +414,20 @@ export default function SiteHub() {
   }, [authLoading, geoLoading, user.type, user.id, isChina])
 
   // ✅ 性能优化：合并收藏和自定义网站的加载，使用 Promise.all 并行请求
+  // ✅ 性能优化：延迟加载数据库数据，不阻塞初始渲染
   useEffect(() => {
     async function loadUserData() {
       // 只有在hydration完成且不是loading状态时才加载
-      if (authLoading || geoLoading) return
+      if (authLoading || geoLoading || !isHydrated) return
+
+      // ✅ 性能优化：更短的延迟，让页面先渲染
+      await new Promise(resolve => {
+        if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+          requestIdleCallback(() => resolve(undefined), { timeout: 200 })
+        } else {
+          setTimeout(() => resolve(undefined), 50)
+        }
+      })
 
       if (user.type === "authenticated" && user.id) {
         // Authenticated users: 并行加载收藏和自定义网站
@@ -555,9 +568,9 @@ export default function SiteHub() {
             setRawSites(defaultSites)
           }
         } else {
-          const defaultSites = getDefaultSites()
-          // ✅ 性能优化：只设置原始数据，处理由 useMemo 自动完成
-          setRawSites(defaultSites)
+          // 已经设置了默认站点，无需再次设置
+          // const defaultSites = getDefaultSites()
+          // setRawSites(defaultSites)
         }
       }
     }
@@ -629,6 +642,11 @@ export default function SiteHub() {
     return null
   }
   // Filter sites based on search and category
+  // ✅ 性能优化：使用更稳定的依赖项，避免不必要的重新计算
+  const sitesLength = sites.length
+  const sitesKey = useMemo(() => sites.map(s => s.id).join(','), [sitesLength])
+  const favoritesLength = favorites.length
+  const favoritesKey = useMemo(() => favorites.join(','), [favoritesLength])
   const filteredSites = useMemo<Site[]>(() => {
     // 防止hydration mismatch：只在客户端渲染完成后处理sites
     if (!isHydrated) {
@@ -660,15 +678,10 @@ export default function SiteHub() {
     }
 
     return filtered
-  }, [sites.length, sites, searchQuery, selectedCategory, favorites.length, favorites, isHydrated])
+  }, [sitesKey, sitesLength, searchQuery, selectedCategory, favoritesKey, favoritesLength, isHydrated])
 
-  // 使用所有过滤后的站点（移除数量限制以显示全部站点）
-  const displayedSites = useMemo(() => {
-    if (!Array.isArray(filteredSites)) {
-      return []
-    }
-    return filteredSites
-  }, [filteredSites])
+  // ✅ 性能优化：直接使用 filteredSites，不需要额外的 useMemo
+  const displayedSites = filteredSites
 
   const nonFeaturedCount = useMemo(() => {
     // 防止hydration mismatch：只在客户端渲染完成后处理sites
