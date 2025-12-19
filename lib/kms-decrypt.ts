@@ -25,9 +25,9 @@ export async function decryptKMSSecret(encryptedValue: string): Promise<string> 
     const client = new KmsClient({
       credential: {
         // 使用腾讯云临时凭证（由云函数自动提供，无需手动配置）
-        // 如果在本地开发，需要配置 TENCENT_SECRET_ID 和 TENCENT_SECRET_KEY
-        secretId: process.env.TENCENT_SECRET_ID || '',
-        secretKey: process.env.TENCENT_SECRET_KEY || '',
+        // 如果在本地开发，需要配置 CLOUDBASE_SECRET_ID 和 CLOUDBASE_SECRET_KEY
+        secretId: process.env.CLOUDBASE_SECRET_ID || '',
+        secretKey: process.env.CLOUDBASE_SECRET_KEY || '',
       },
       region: 'ap-guangzhou', // 根据实际KMS密钥所在区域调整
     })

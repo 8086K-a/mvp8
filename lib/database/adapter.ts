@@ -25,6 +25,11 @@ export interface IDatabaseAdapter {
   // 订阅功能
   getSubscription(): Promise<any | null>
   upsertSubscription(subscription: any): Promise<boolean>
+
+  // 支付功能
+  savePaymentTransaction(transaction: any): Promise<boolean>
+  updatePaymentStatus(transactionId: string, status: string): Promise<boolean>
+  getPaymentTransaction(transactionId: string): Promise<any | null>
 }
 
 /**

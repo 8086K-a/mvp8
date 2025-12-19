@@ -3,7 +3,14 @@
  * 用于官网国内IP用户的数据存储
  */
 
-import { db, COLLECTIONS, getCollection } from './cloudbase-client'
+// CloudBase集合名称（硬编码避免动态导入问题）
+const COLLECTIONS = {
+  USERS: 'web_users',
+  FAVORITES: 'web_favorites',
+  CUSTOM_SITES: 'web_custom_sites',
+  SUBSCRIPTIONS: 'web_subscriptions',
+  PAYMENT_TRANSACTIONS: 'web_payment_transactions'
+}
 
 /**
  * CloudBase适配器类
@@ -14,16 +21,37 @@ export class CloudBaseAdapter {
 
   constructor(userId: string) {
     this.userId = userId
-    // 确保db已初始化
-    this.db = db
+    // 数据库实例将在第一次使用时初始化
+    this.db = null
   }
 
-  // 辅助方法：安全获取db实例
+  // 辅助方法：安全获取db实例和集合
   private getDb() {
-    if (!this.db && typeof window !== 'undefined') {
-      // 重新尝试获取db
-      const { db: freshDb } = require('./cloudbase-client')
-      this.db = freshDb
+    // 只在服务器端初始化数据库
+    if (typeof window !== 'undefined') {
+      console.warn('⚠️ [CloudBase] 客户端不支持数据库操作')
+      return null
+    }
+
+    if (!this.db) {
+      // 服务器端直接初始化（只在运行时，不在构建时）
+      try {
+        // 使用require而不是import，避免webpack处理
+        const cloudbase = eval('require')('@cloudbase/node-sdk')
+        const envId = process.env.NEXT_PUBLIC_WECHAT_CLOUDBASE_ID || 'cloudbase-1gnip2iaa08260e5'
+
+        const app = cloudbase.init({
+          env: envId,
+          secretId: process.env.CLOUDBASE_SECRET_ID,
+          secretKey: process.env.CLOUDBASE_SECRET_KEY
+        })
+
+        this.db = app.database()
+        console.log('✅ [CloudBase] 数据库实例初始化成功')
+      } catch (error) {
+        console.error('❌ [CloudBase] 获取数据库实例失败:', error)
+        return null
+      }
     }
     return this.db
   }
@@ -33,6 +61,12 @@ export class CloudBaseAdapter {
   // ==========================================
 
   async getFavorites(): Promise<string[]> {
+    // 客户端环境不支持数据库操作
+    if (typeof window !== 'undefined') {
+      console.warn('⚠️ [DB-腾讯云] 客户端不支持数据库操作')
+      return []
+    }
+
     try {
       const database = this.getDb()
       if (!database) {
@@ -53,6 +87,12 @@ export class CloudBaseAdapter {
   }
 
   async addFavorite(siteId: string): Promise<boolean> {
+    // 客户端环境不支持数据库操作
+    if (typeof window !== 'undefined') {
+      console.warn('⚠️ [DB-腾讯云] 客户端不支持数据库操作')
+      return false
+    }
+
     try {
       const database = this.getDb()
       if (!database) {
@@ -76,7 +116,7 @@ export class CloudBaseAdapter {
 
   async removeFavorite(siteId: string): Promise<boolean> {
     try {
-      const database = this.getDb()
+      const database = await this.getDb()
       if (!database) {
         console.warn('⚠️ [DB-腾讯云] 数据库未初始化')
         return false
@@ -103,7 +143,7 @@ export class CloudBaseAdapter {
 
   async getCustomSites(): Promise<any[]> {
     try {
-      const database = this.getDb()
+      const database = await this.getDb()
       if (!database) {
         console.warn('⚠️ [DB-腾讯云] 数据库未初始化')
         return []
@@ -124,7 +164,7 @@ export class CloudBaseAdapter {
 
   async addCustomSite(site: any): Promise<boolean> {
     try {
-      const database = this.getDb()
+      const database = await this.getDb()
       if (!database) {
         console.warn('⚠️ [DB-腾讯云] 数据库未初始化')
         return false
@@ -151,7 +191,7 @@ export class CloudBaseAdapter {
 
   async removeCustomSite(siteId: string): Promise<boolean> {
     try {
-      const database = this.getDb()
+      const database = await this.getDb()
       if (!database) {
         console.warn('⚠️ [DB-腾讯云] 数据库未初始化')
         return false
@@ -174,8 +214,169 @@ export class CloudBaseAdapter {
   // ==========================================
 
   async getSubscription(): Promise<any | null> {
+    // 客户端环境不支持数据库操作
+    if (typeof window !== 'undefined') {
+      console.warn('⚠️ [DB-腾讯云] 客户端不支持数据库操作')
+      return null
+    }
+
     try {
       const database = this.getDb()
+      if (!database) {
+        console.warn('⚠️ [DB-腾讯云] 数据库未初始化')
+        return null
+      }
+
+      const res = await database.collection(COLLECTIONS.SUBSCRIPTIONS)
+        .where({ user_id: this.userId })
+        .get()
+
+      console.log('✅ [DB-腾讯云] 获取订阅:', res.data.length > 0 ? '已订阅' : '未订阅')
+      return res.data.length > 0 ? res.data[0] : null
+    } catch (error) {
+      console.error('❌ [DB-腾讯云] 获取订阅失败:', error)
+      return null
+    }
+  }
+
+  async upsertSubscription(subscription: any): Promise<boolean> {
+    // 客户端环境不支持数据库操作
+    if (typeof window !== 'undefined') {
+      console.warn('⚠️ [DB-腾讯云] 客户端不支持数据库操作')
+      return false
+    }
+
+    try {
+      console.log('🔄 [DB-腾讯云] 开始更新订阅，用户ID:', this.userId)
+      console.log('📋 [DB-腾讯云] 订阅数据:', subscription)
+
+      const database = this.getDb()
+      if (!database) {
+        console.warn('⚠️ [DB-腾讯云] 数据库未初始化')
+        return false
+      }
+
+      console.log('📊 [DB-腾讯云] 集合名称:', COLLECTIONS.SUBSCRIPTIONS)
+
+      const result = await database.collection(COLLECTIONS.SUBSCRIPTIONS).add({
+        user_id: this.userId,
+        ...subscription,
+        created_at: new Date(),
+        updated_at: new Date()
+      })
+
+      console.log('✅ [DB-腾讯云] 订阅创建成功，记录ID:', result.id)
+      return true
+    } catch (error) {
+      console.error('❌ [DB-腾讯云] 更新订阅失败:', error)
+      console.error('❌ [DB-腾讯云] 错误详情:', {
+        message: error.message,
+        code: error.code,
+        requestId: error.requestId,
+        userId: this.userId
+      })
+      return false
+    }
+  }
+
+  // ==========================================
+  // 支付功能
+  // ==========================================
+
+  async savePaymentTransaction(transaction: any): Promise<boolean> {
+    // 客户端环境不支持数据库操作
+    if (typeof window !== 'undefined') {
+      console.warn('⚠️ [DB-腾讯云] 客户端不支持数据库操作')
+      return false
+    }
+
+    try {
+      const database = this.getDb()
+      if (!database) {
+        console.warn('⚠️ [DB-腾讯云] 数据库未初始化')
+        return false
+      }
+
+      // CloudBase字段结构
+      const cloudbaseTransaction = {
+        user_id: this.userId,
+        product_name: transaction.product_name || 'sitehub',
+        plan_type: transaction.plan_type,
+        billing_cycle: transaction.billing_cycle,
+        payment_method: transaction.payment_method,
+        payment_status: transaction.payment_status || 'pending',
+        transaction_type: transaction.transaction_type || 'purchase',
+        currency: transaction.currency || 'CNY',
+        gross_amount: transaction.gross_amount,
+        payment_fee: transaction.payment_fee || 0,
+        net_amount: transaction.net_amount || transaction.gross_amount,
+        profit: transaction.profit || transaction.net_amount,
+        transaction_id: transaction.transaction_id,
+        payment_time: transaction.payment_time || new Date().toISOString()
+      }
+
+      await database.collection(COLLECTIONS.PAYMENT_TRANSACTIONS).add(cloudbaseTransaction)
+
+      console.log('✅ [DB-腾讯云] 保存支付记录成功:', transaction.transaction_id)
+      return true
+    } catch (error) {
+      console.error('❌ [DB-腾讯云] 保存支付记录失败:', error)
+      return false
+    }
+  }
+
+  async updatePaymentStatus(transactionId: string, status: string): Promise<boolean> {
+    try {
+      const database = await this.getDb()
+      if (!database) {
+        console.warn('⚠️ [DB-腾讯云] 数据库未初始化')
+        return false
+      }
+
+      await database.collection(COLLECTIONS.PAYMENT_TRANSACTIONS)
+        .where({ transaction_id: transactionId })
+        .update({
+          payment_status: status,
+          updated_at: new Date()
+        })
+
+      console.log('✅ [DB-腾讯云] 更新支付状态成功:', transactionId, status)
+      return true
+    } catch (error) {
+      console.error('❌ [DB-腾讯云] 更新支付状态失败:', error)
+      return false
+    }
+  }
+
+  async getPaymentTransaction(transactionId: string): Promise<any | null> {
+    // 客户端环境不支持数据库操作
+    if (typeof window !== 'undefined') {
+      console.warn('⚠️ [DB-腾讯云] 客户端不支持数据库操作')
+      return null
+    }
+
+    try {
+      const database = this.getDb()
+      if (!database) {
+        console.warn('⚠️ [DB-腾讯云] 数据库未初始化')
+        return null
+      }
+
+      const res = await database.collection(COLLECTIONS.PAYMENT_TRANSACTIONS)
+        .where({ transaction_id: transactionId })
+        .get()
+
+      console.log('✅ [DB-腾讯云] 获取支付记录:', res.data.length > 0 ? '找到' : '未找到')
+      return res.data.length > 0 ? res.data[0] : null
+    } catch (error) {
+      console.error('❌ [DB-腾讯云] 获取支付记录失败:', error)
+      return null
+    }
+  }
+
+  async getSubscription(): Promise<any | null> {
+    try {
+      const database = await this.getDb()
       if (!database) {
         console.warn('⚠️ [DB-腾讯云] 数据库未初始化')
         return null
@@ -197,6 +398,12 @@ export class CloudBaseAdapter {
   }
 
   async upsertSubscription(subscription: any): Promise<boolean> {
+    // 客户端环境不支持数据库操作
+    if (typeof window !== 'undefined') {
+      console.warn('⚠️ [DB-腾讯云] 客户端不支持数据库操作')
+      return false
+    }
+
     try {
       const database = this.getDb()
       if (!database) {

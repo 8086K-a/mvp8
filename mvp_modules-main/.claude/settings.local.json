@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm build:*)",
+      "Bash(pnpm install:*)",
+      "Bash(ls:*)",
+      "Bash(npm run build:*)",
+      "Bash(curl:*)",
+      "Bash(cat:*)",
+      "Bash(printf:*)",
+      "Bash(wc:*)",
+      "Bash(find:*)",
+      "Bash(dir:*)",
+      "Bash(done)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

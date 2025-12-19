@@ -3,8 +3,6 @@
  * 用于官网国内IP用户的数据存储
  */
 
-import cloudbase from '@cloudbase/js-sdk'
-
 // 延迟初始化，避免SSR错误
 let app: any = null
 let db: any = null
@@ -17,11 +15,6 @@ let initPromise: Promise<any> | null = null
 async function initCloudBase() {
   if (app) return { app, db, auth } // 已初始化
 
-  // 只在浏览器端初始化，避免SSR时window undefined错误
-  if (typeof window === 'undefined') {
-    return { app: null, db: null, auth: null }
-  }
-
   // 如果正在初始化中，等待完成
   if (initPromise) {
     return initPromise
@@ -29,11 +22,17 @@ async function initCloudBase() {
 
   initPromise = (async () => {
     try {
+      // 动态导入Node.js SDK，避免客户端构建问题
+      const cloudbase = (await import('@cloudbase/node-sdk')).default
+
       // 直接从环境变量读取 CloudBase ID
       const envId = process.env.NEXT_PUBLIC_WECHAT_CLOUDBASE_ID || 'cloudbase-1gnip2iaa08260e5'
 
+      // 使用Node.js SDK，支持服务器端
       app = cloudbase.init({
-        env: envId
+        env: envId,
+        secretId: process.env.CLOUDBASE_SECRET_ID,
+        secretKey: process.env.CLOUDBASE_SECRET_KEY
       })
 
       db = app.database()
@@ -50,13 +49,13 @@ async function initCloudBase() {
   return initPromise
 }
 
-// 浏览器端自动初始化
-if (typeof window !== 'undefined') {
+// 只在服务器端自动初始化
+if (typeof window === 'undefined') {
   initCloudBase()
 }
 
-// 导出实例
-export { db, auth }
+// 导出实例和初始化函数
+export { db, auth, initCloudBase }
 export default app
 
 // 辅助函数：获取集合引用

@@ -1,0 +1,1640 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SiteHub（个人网址导航系统） - 软件需求说明书（软著鉴别材料）</title>
+  <style>
+:root { --fg: #111; --muted: #666; --border: #ddd; }
+* { box-sizing: border-box; }
+html, body { padding: 0; margin: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", Arial, sans-serif; color: var(--fg); }
+@page { size: A4; margin: 16mm 14mm; }
+.page { page-break-after: always; }
+.page-header { border-bottom: 1px solid var(--border); padding-bottom: 6mm; margin-bottom: 6mm; }
+.h1 { font-size: 15pt; font-weight: 700; letter-spacing: 0.2px; }
+.meta { margin-top: 2mm; font-size: 10pt; color: var(--muted); }
+.page-body h2 { font-size: 13pt; margin: 0 0 4mm 0; }
+.page-body p { font-size: 10.5pt; line-height: 1.55; margin: 0 0 3mm 0; }
+.page-body ul { margin: 0 0 3mm 5mm; padding: 0; }
+.page-body li { font-size: 10.5pt; line-height: 1.55; margin: 0 0 2mm 0; }
+.page-body dl { display: grid; grid-template-columns: 30mm 1fr; gap: 2mm 6mm; margin: 0 0 3mm 0; }
+.page-body dt { font-weight: 700; font-size: 10.5pt; }
+.page-body dd { margin: 0; font-size: 10.5pt; }
+.page-footer { border-top: 1px solid var(--border); margin-top: 8mm; padding-top: 3mm; font-size: 9pt; color: var(--muted); }
+.muted { color: var(--muted); }
+table { width: 100%; border-collapse: collapse; margin: 0 0 3mm 0; }
+th, td { border: 1px solid var(--border); padding: 2.2mm 2.5mm; vertical-align: top; font-size: 10pt; line-height: 1.4; }
+th { background: #f6f6f6; }
+</style>
+</head>
+<body>
+
+<section class="page">
+  <div class="page-header">
+    <div class="h1">SiteHub（个人网址导航系统） — 软件需求说明书（软著鉴别材料）</div>
+    <div class="meta">版本：V1.0.0　日期：2025年12月16日　单位：个人开发者</div>
+  </div>
+  <div class="page-body">
+    <h2>封面</h2>
+    
+    <dl><dt>软件名称</dt><dd>SiteHub（个人网址导航系统）</dd>
+<dt>文档名称</dt><dd>软件需求说明书（软著鉴别材料）</dd>
+<dt>版本</dt><dd>V0.1.0</dd>
+<dt>编制日期</dt><dd>2025年12月16日</dd>
+<dt>编制单位</dt><dd>个人开发者</dd></dl>
+    <p>本说明书用于描述软件的需求、功能范围、接口与运行环境，用于软件著作权登记的文档鉴别材料。</p>
+    
+  </div>
+  <div class="page-footer">
+    <span class="muted">软著鉴别材料：前30页 + 后30页（不足可重复）</span>
+  </div>
+</section>
+
+
+<section class="page">
+  <div class="page-header">
+    <div class="h1">SiteHub（个人网址导航系统） — 软件需求说明书（软著鉴别材料）</div>
+    <div class="meta">版本：V0.1.0　日期：2025年12月16日　单位：个人开发者</div>
+  </div>
+  <div class="page-body">
+    <h2>文档使用说明与范围</h2>
+    
+    <p>本文档基于当前代码仓库实现整理，覆盖：功能需求、数据与接口、非功能性需求、约束与验收要点。</p>
+    <p>如用于软著提交，通常需提交“前30页 + 后30页”内容；若不足60页，允许重复。</p>
+    
+  </div>
+  <div class="page-footer">
+    <span class="muted">软著鉴别材料：前30页 + 后30页（不足可重复）</span>
+  </div>
+</section>
+
+
+<section class="page">
+  <div class="page-header">
+    <div class="h1">SiteHub（个人网址导航系统） — 软件需求说明书（软著鉴别材料）</div>
+    <div class="meta">版本：V0.1.0　日期：2025年12月16日　单位：个人开发者</div>
+  </div>
+  <div class="page-body">
+    <h2>系统概述</h2>
+    <p>本系统为个人网址导航与管理平台，提供类似浏览器新标签页的快速入口，支持站点收藏、拖拽排序、自定义站点、账号登录与数据持久化，并兼容国内/海外不同数据源。</p>
+  </div>
+  <div class="page-footer">
+    <span class="muted">软著鉴别材料：前30页 + 后30页（不足可重复）</span>
+  </div>
+</section>
+
+
+<section class="page">
+  <div class="page-header">
+    <div class="h1">SiteHub（个人网址导航系统） — 软件需求说明书（软著鉴别材料）</div>
+    <div class="meta">版本：V0.1.0　日期：2025年12月16日　单位：个人开发者</div>
+  </div>
+  <div class="page-body">
+    <h2>术语与缩略语</h2>
+    
+<table>
+  <thead><tr><th>术语</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td>访客模式</td><td>未登录用户的试用模式，具有时间限制与数据丢失提示</td></tr>
+<tr><td>收藏</td><td>用户标记的重要站点（⭐）</td></tr>
+<tr><td>自定义站点</td><td>用户自行添加的站点快捷方式</td></tr>
+<tr><td>适配器</td><td>对不同后端（CloudBase/Supabase）提供统一接口的抽象</td></tr>
+  </tbody>
+</table>
+  </div>
+  <div class="page-footer">
+    <span class="muted">软著鉴别材料：前30页 + 后30页（不足可重复）</span>
+  </div>
+</section>
+
+
+<section class="page">
+  <div class="page-header">
+    <div class="h1">SiteHub（个人网址导航系统） — 软件需求说明书（软著鉴别材料）</div>
+    <div class="meta">版本：V0.1.0　日期：2025年12月16日　单位：个人开发者</div>
+  </div>
+  <div class="page-body">
+    <h2>用户角色</h2>
+    <ul><li>访客用户：无需登录试用核心能力（受10分钟限制）</li>
+<li>注册用户：可持久化保存收藏与自定义站点</li>
+<li>管理员（可选）：用于运营配置、支付回调核验等（以服务端接口能力为主）</li></ul>
+  </div>
+  <div class="page-footer">
+    <span class="muted">软著鉴别材料：前30页 + 后30页（不足可重复）</span>
+  </div>
+</section>
+
+
+<section class="page">
+  <div class="page-header">
+    <div class="h1">SiteHub（个人网址导航系统） — 软件需求说明书（软著鉴别材料）</div>
+    <div class="meta">版本：V0.1.0　日期：2025年12月16日　单位：个人开发者</div>
+  </div>
+  <div class="page-body">
+    <h2>运行环境</h2>
+    <ul><li>前端：Next.js 14 + React 18 + TypeScript</li>
+<li>样式与组件：Tailwind CSS + Radix UI</li>
+<li>后端：Next.js Route Handlers / Pages API</li>
+<li>数据：海外 Supabase；国内 CloudBase（通过接口/SDK）</li>
+<li>浏览器：Chrome/Edge/Safari 等现代浏览器</li></ul>
+  </div>
+  <div class="page-footer">
+    <span class="muted">软著鉴别材料：前30页 + 后30页（不足可重复）</span>
+  </div>
+</section>
+
+
+<section class="page">
+  <div class="page-header">
+    <div class="h1">SiteHub（个人网址导航系统） — 软件需求说明书（软著鉴别材料）</div>
+    <div class="meta">版本：V0.1.0　日期：2025年12月16日　单位：个人开发者</div>
+  </div>
+  <div class="page-body">
+    <h2>系统边界与外部接口</h2>
+    <ul><li>第三方支付：Stripe / PayPal / 支付宝 / 微信支付</li>
+<li>认证与身份：Email、WeChat（以及测试Google登录路由）</li>
+<li>地理位置/地区识别：服务端检测接口</li></ul>
+  </div>
+  <div class="page-footer">
+    <span class="muted">软著鉴别材料：前30页 + 后30页（不足可重复）</span>
+  </div>
+</section>
+
+
+<section class="page">
+  <div class="page-header">
+    <div class="h1">SiteHub（个人网址导航系统） — 软件需求说明书（软著鉴别材料）</div>
+    <div class="meta">版本：V0.1.0　日期：2025年12月16日　单位：个人开发者</div>
+  </div>
+  <div class="page-body">
+    <h2>核心功能清单</h2>
+    <ul><li>内置站点库（canonical 数据源，含精选与分类）</li>
+<li>站点展示：超紧凑网格/可拖拽排序</li>
+<li>搜索与分类筛选</li>
+<li>收藏系统（⭐收藏/取消收藏）</li>
+<li>自定义站点（新增/删除/去重校验）</li>
+<li>访客模式：10分钟试用倒计时与数据丢失提示</li>
+<li>登录/注册：Email + WeChat（以及测试Google登录路由）</li>
+<li>地区与数据源适配：国内 CloudBase / 海外 Supabase（适配器模式）</li>
+<li>支付能力：Stripe / PayPal / 支付宝 / 微信支付（接口路由）</li>
+<li>国际化：中英文 UI 文案</li></ul>
+  </div>
+  <div class="page-footer">
+    <span class="muted">软著鉴别材料：前30页 + 后30页（不足可重复）</span>
+  </div>
+</section>
+
+
+<section class="page">
+  <div class="page-header">
+    <div class="h1">SiteHub（个人网址导航系统） — 软件需求说明书（软著鉴别材料）</div>
+    <div class="meta">版本：V0.1.0　日期：2025年12月16日　单位：个人开发者</div>
+  </div>
+  <div class="page-body">
+    <h2>FR-01 站点展示与分类</h2>
+    
+    <p><b>描述</b>：系统提供内置站点库，并按类别展示；支持精选内容优先展示。</p>
+    
+<table>
+  <thead><tr><th>条目</th><th>要求</th></tr></thead>
+  <tbody>
+    <tr><td>分类</td><td>站点具备category字段；可按类别导航</td></tr>
+<tr><td>精选</td><td>精选内容在列表中优先展示</td></tr>
+<tr><td>地区优先</td><td>国内/海外下站点排序策略不同</td></tr>
+  </tbody>
+</table>
+    
+  </div>
+  <div class="page-footer">
+    <span class="muted">软著鉴别材料：前30页 + 后30页（不足可重复）</span>
+  </div>
+</section>
+
+
+<section class="page">
+  <div class="page-header">
+    <div class="h1">SiteHub（个人网址导航系统） — 软件需求说明书（软著鉴别材料）</div>
+    <div class="meta">版本：V0.1.0　日期：2025年12月16日　单位：个人开发者</div>
+  </div>
+  <div class="page-body">
+    <h2>FR-02 搜索与筛选</h2>
+    
+    <p><b>描述</b>：用户可通过搜索框快速定位站点，并结合分类筛选显示结果。</p>
+    
+<table>
+  <thead><tr><th>条目</th><th>要求</th></tr></thead>
+  <tbody>
+    <tr><td>搜索范围</td><td>站点名称/别名（中英文）</td></tr>
+<tr><td>筛选</td><td>按分类过滤</td></tr>
+<tr><td>展示</td><td>结果实时更新，保持响应速度</td></tr>
+  </tbody>
+</table>
+    
+  </div>
+  <div class="page-footer">
+    <span class="muted">软著鉴别材料：前30页 + 后30页（不足可重复）</span>
+  </div>
+</section>
+
+
+<section class="page">
+  <div class="page-header">
+    <div class="h1">SiteHub（个人网址导航系统） — 软件需求说明书（软著鉴别材料）</div>
+    <div class="meta">版本：V0.1.0　日期：2025年12月16日　单位：个人开发者</div>
+  </div>
+  <div class="page-body">
+    <h2>FR-03 收藏管理</h2>
+    
+    <p><b>描述</b>：用户可将站点加入收藏（⭐）或取消收藏；收藏状态在UI中可见。</p>
+    
+<table>
+  <thead><tr><th>条目</th><th>要求</th></tr></thead>
+  <tbody>
+    <tr><td>加入收藏</td><td>对未收藏站点执行添加操作</td></tr>
+<tr><td>取消收藏</td><td>对已收藏站点执行移除操作</td></tr>
+<tr><td>持久化</td><td>登录用户写入后端；访客写入localStorage</td></tr>
+  </tbody>
+</table>
+    
+  </div>
+  <div class="page-footer">
+    <span class="muted">软著鉴别材料：前30页 + 后30页（不足可重复）</span>
+  </div>
+</section>
+
+
+<section class="page">
+  <div class="page-header">
+    <div class="h1">SiteHub（个人网址导航系统） — 软件需求说明书（软著鉴别材料）</div>
+    <div class="meta">版本：V0.1.0　日期：2025年12月16日　单位：个人开发者</div>
+  </div>
+  <div class="page-body">
+    <h2>FR-04 自定义站点管理</h2>
+    
+    <p><b>描述</b>：用户可新增自定义站点快捷方式，并支持删除；系统应避免重复链接。</p>
+    
+<table>
+  <thead><tr><th>条目</th><th>要求</th></tr></thead>
+  <tbody>
+    <tr><td>新增</td><td>输入名称与URL，生成站点条目</td></tr>
+<tr><td>去重</td><td>同一URL不应重复添加</td></tr>
+<tr><td>删除</td><td>仅自定义站点允许删除</td></tr>
+<tr><td>持久化</td><td>登录用户写入后端；访客写入localStorage</td></tr>
+  </tbody>
+</table>
+    
+  </div>
+  <div class="page-footer">
+    <span class="muted">软著鉴别材料：前30页 + 后30页（不足可重复）</span>
+  </div>
+</section>
+
+
+<section class="page">
+  <div class="page-header">
+    <div class="h1">SiteHub（个人网址导航系统） — 软件需求说明书（软著鉴别材料）</div>
+    <div class="meta">版本：V0.1.0　日期：2025年12月16日　单位：个人开发者</div>
+  </div>
+  <div class="page-body">
+    <h2>FR-05 拖拽排序</h2>
+    
+    <p><b>描述</b>：用户可通过拖拽改变站点顺序，系统保存新排序并在下次打开时恢复。</p>
+    
+<table>
+  <thead><tr><th>条目</th><th>要求</th></tr></thead>
+  <tbody>
+    <tr><td>拖拽交互</td><td>拖拽手势生效，排序即时更新</td></tr>
+<tr><td>保存策略</td><td>访客localStorage；登录用户保存到后端</td></tr>
+<tr><td>兼容性</td><td>桌面端与移动端触控均可用</td></tr>
+  </tbody>
+</table>
+    
+  </div>
+  <div class="page-footer">
+    <span class="muted">软著鉴别材料：前30页 + 后30页（不足可重复）</span>
+  </div>
+</section>
+
+
+<section class="page">
+  <div class="page-header">
+    <div class="h1">SiteHub（个人网址导航系统） — 软件需求说明书（软著鉴别材料）</div>
+    <div class="meta">版本：V0.1.0　日期：2025年12月16日　单位：个人开发者</div>
+  </div>
+  <div class="page-body">
+    <h2>FR-06 访客模式与时间限制</h2>
+    
+    <p><b>描述</b>：访客模式提供10分钟体验倒计时；接近到期提示数据将丢失，到期后引导注册/升级。</p>
+    
+<table>
+  <thead><tr><th>条目</th><th>要求</th></tr></thead>
+  <tbody>
+    <tr><td>开始计时</td><td>首次进入时记录开始时间</td></tr>
+<tr><td>倒计时展示</td><td>在Header区域展示剩余时间</td></tr>
+<tr><td>警告提示</td><td>临近到期展示提示语</td></tr>
+<tr><td>到期处理</td><td>到期后限制部分操作并提示升级</td></tr>
+  </tbody>
+</table>
+    
+  </div>
+  <div class="page-footer">
+    <span class="muted">软著鉴别材料：前30页 + 后30页（不足可重复）</span>
+  </div>
+</section>
+
+
+<section class="page">
+  <div class="page-header">
+    <div class="h1">SiteHub（个人网址导航系统） — 软件需求说明书（软著鉴别材料）</div>
+    <div class="meta">版本：V0.1.0　日期：2025年12月16日　单位：个人开发者</div>
+  </div>
+  <div class="page-body">
+    <h2>FR-07 登录与账号体系</h2>
+    
+    <p><b>描述</b>：系统支持用户登录/注册，登录后可跨会话持久化数据。</p>
+    
+<table>
+  <thead><tr><th>方式</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td>Email</td><td>通过服务端路由进行认证处理</td></tr>
+<tr><td>WeChat</td><td>支持微信相关认证流程</td></tr>
+<tr><td>会话管理</td><td>支持刷新、过期处理与退出</td></tr>
+  </tbody>
+</table>
+    
+  </div>
+  <div class="page-footer">
+    <span class="muted">软著鉴别材料：前30页 + 后30页（不足可重复）</span>
+  </div>
+</section>
+
+
+<section class="page">
+  <div class="page-header">
+    <div class="h1">SiteHub（个人网址导航系统） — 软件需求说明书（软著鉴别材料）</div>
+    <div class="meta">版本：V0.1.0　日期：2025年12月16日　单位：个人开发者</div>
+  </div>
+  <div class="page-body">
+    <h2>FR-08 地区识别与数据源适配</h2>
+    
+    <p><b>描述</b>：系统根据用户地区选择国内/海外数据通道，实现同一业务能力在不同后端上工作。</p>
+    
+<table>
+  <thead><tr><th>条目</th><th>要求</th></tr></thead>
+  <tbody>
+    <tr><td>地区检测</td><td>提供/使用地区检测接口</td></tr>
+<tr><td>海外</td><td>使用Supabase等后端存储</td></tr>
+<tr><td>国内</td><td>使用CloudBase相关接口/SDK</td></tr>
+<tr><td>统一接口</td><td>通过适配器封装增删改查</td></tr>
+  </tbody>
+</table>
+    
+  </div>
+  <div class="page-footer">
+    <span class="muted">软著鉴别材料：前30页 + 后30页（不足可重复）</span>
+  </div>
+</section>
+
+
+<section class="page">
+  <div class="page-header">
+    <div class="h1">SiteHub（个人网址导航系统） — 软件需求说明书（软著鉴别材料）</div>
+    <div class="meta">版本：V0.1.0　日期：2025年12月16日　单位：个人开发者</div>
+  </div>
+  <div class="page-body">
+    <h2>FR-09 支付与订阅（接口能力）</h2>
+    
+    <p><b>描述</b>：系统提供多支付渠道的创建、查询与回调通知接口，用于会员/订阅或增值服务的支付链路。</p>
+    
+<table>
+  <thead><tr><th>渠道</th><th>接口</th></tr></thead>
+  <tbody>
+    <tr><td>Stripe</td><td>create/check/webhook</td></tr>
+<tr><td>PayPal</td><td>create/capture</td></tr>
+<tr><td>支付宝</td><td>create/notify/verify</td></tr>
+<tr><td>微信支付</td><td>create/notify</td></tr>
+  </tbody>
+</table>
+    <p class="muted">说明：具体业务策略（商品、价格、权益）可在后续迭代中完善。</p>
+    
+  </div>
+  <div class="page-footer">
+    <span class="muted">软著鉴别材料：前30页 + 后30页（不足可重复）</span>
+  </div>
+</section>
+
+
+<section class="page">
+  <div class="page-header">
+    <div class="h1">SiteHub（个人网址导航系统） — 软件需求说明书（软著鉴别材料）</div>
+    <div class="meta">版本：V0.1.0　日期：2025年12月16日　单位：个人开发者</div>
+  </div>
+  <div class="page-body">
+    <h2>页面与路由（Page）清单</h2>
+    <ul><li>/（首页）</li>
+<li>/dashboard</li>
+<li>/integrations</li>
+<li>/playground</li>
+<li>/privacy</li>
+<li>/settings</li>
+<li>/auth/*（回调/找回密码/重置密码等）</li>
+<li>/payment/*（支付结果页）</li></ul>
+  </div>
+  <div class="page-footer">
+    <span class="muted">软著鉴别材料：前30页 + 后30页（不足可重复）</span>
+  </div>
+</section>
+
+
+<section class="page">
+  <div class="page-header">
+    <div class="h1">SiteHub（个人网址导航系统） — 软件需求说明书（软著鉴别材料）</div>
+    <div class="meta">版本：V0.1.0　日期：2025年12月16日　单位：个人开发者</div>
+  </div>
+  <div class="page-body">
+    <h2>服务端接口（App Router）清单</h2>
+    <ul><li>POST /api/auth/email</li>
+<li>POST /api/auth/wechat</li>
+<li>GET  /api/geo/detect</li>
+<li>GET  /api/test-google-auth</li>
+<li>POST /api/payment/stripe/create</li>
+<li>POST /api/payment/stripe/check</li>
+<li>POST /api/payment/stripe/webhook</li>
+<li>POST /api/payment/paypal/create</li>
+<li>POST /api/payment/paypal/capture</li>
+<li>POST /api/payment/alipay/create</li>
+<li>POST /api/payment/alipay/notify</li>
+<li>POST /api/payment/alipay/verify</li>
+<li>POST /api/payment/wechat/create</li>
+<li>POST /api/payment/wechat/notify</li></ul>
+  </div>
+  <div class="page-footer">
+    <span class="muted">软著鉴别材料：前30页 + 后30页（不足可重复）</span>
+  </div>
+</section>
+
+
+<section class="page">
+  <div class="page-header">
+    <div class="h1">SiteHub（个人网址导航系统） — 软件需求说明书（软著鉴别材料）</div>
+    <div class="meta">版本：V0.1.0　日期：2025年12月16日　单位：个人开发者</div>
+  </div>
+  <div class="page-body">
+    <h2>服务端接口（Pages API）清单</h2>
+    <ul><li>POST /api/auth-cn</li>
+<li>GET/POST /api/custom-sites-cn</li>
+<li>GET/POST /api/favorites-cn</li></ul>
+  </div>
+  <div class="page-footer">
+    <span class="muted">软著鉴别材料：前30页 + 后30页（不足可重复）</span>
+  </div>
+</section>
+
+
+<section class="page">
+  <div class="page-header">
+    <div class="h1">SiteHub（个人网址导航系统） — 软件需求说明书（软著鉴别材料）</div>
+    <div class="meta">版本：V0.1.0　日期：2025年12月16日　单位：个人开发者</div>
+  </div>
+  <div class="page-body">
+    <h2>核心数据结构（概念模型）</h2>
+    
+<table>
+  <thead><tr><th>实体</th><th>关键字段</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td>Site</td><td>id, name, url, category, custom, featured</td><td>站点条目</td></tr>
+<tr><td>Favorite</td><td>user_id, site_id</td><td>用户收藏关系</td></tr>
+<tr><td>CustomWebsite</td><td>user_id, name, url, icon, category, sort_order</td><td>用户自定义站点</td></tr>
+  </tbody>
+</table>
+  </div>
+  <div class="page-footer">
+    <span class="muted">软著鉴别材料：前30页 + 后30页（不足可重复）</span>
+  </div>
+</section>
+
+
+<section class="page">
+  <div class="page-header">
+    <div class="h1">SiteHub（个人网址导航系统） — 软件需求说明书（软著鉴别材料）</div>
+    <div class="meta">版本：V0.1.0　日期：2025年12月16日　单位：个人开发者</div>
+  </div>
+  <div class="page-body">
+    <h2>数据持久化策略</h2>
+    
+    <ul><li>访客：localStorage 保存站点列表、收藏列表与试用开始时间</li>
+<li>登录用户：通过后端接口/适配器写入数据库（国内/海外差异化实现）</li>
+<li>迁移：可支持从访客数据迁移到登录用户（以业务逻辑实现为准）</li></ul>
+    
+  </div>
+  <div class="page-footer">
+    <span class="muted">软著鉴别材料：前30页 + 后30页（不足可重复）</span>
+  </div>
+</section>
+
+
+<section class="page">
+  <div class="page-header">
+    <div class="h1">SiteHub（个人网址导航系统） — 软件需求说明书（软著鉴别材料）</div>
+    <div class="meta">版本：V0.1.0　日期：2025年12月16日　单位：个人开发者</div>
+  </div>
+  <div class="page-body">
+    <h2>NFR-01 性能需求</h2>
+    <ul><li>首屏加载尽量减少阻塞，客户端渲染避免Hydration不一致</li>
+<li>列表渲染与拖拽交互需保持流畅（避免大规模重算）</li>
+<li>生产环境构建启用压缩与分包策略</li></ul>
+  </div>
+  <div class="page-footer">
+    <span class="muted">软著鉴别材料：前30页 + 后30页（不足可重复）</span>
+  </div>
+</section>
+
+
+<section class="page">
+  <div class="page-header">
+    <div class="h1">SiteHub（个人网址导航系统） — 软件需求说明书（软著鉴别材料）</div>
+    <div class="meta">版本：V0.1.0　日期：2025年12月16日　单位：个人开发者</div>
+  </div>
+  <div class="page-body">
+    <h2>NFR-02 可靠性与容错</h2>
+    <ul><li>localStorage读取失败时需要兜底默认数据</li>
+<li>接口调用失败需提示并允许重试</li>
+<li>支付回调应具备签名/校验（由渠道要求决定）</li></ul>
+  </div>
+  <div class="page-footer">
+    <span class="muted">软著鉴别材料：前30页 + 后30页（不足可重复）</span>
+  </div>
+</section>
+
+
+<section class="page">
+  <div class="page-header">
+    <div class="h1">SiteHub（个人网址导航系统） — 软件需求说明书（软著鉴别材料）</div>
+    <div class="meta">版本：V0.1.0　日期：2025年12月16日　单位：个人开发者</div>
+  </div>
+  <div class="page-body">
+    <h2>NFR-03 安全性</h2>
+    <ul><li>认证令牌不得在日志中泄露</li>
+<li>支付回调接口需校验来源与签名</li>
+<li>敏感配置通过环境变量注入，不写死在前端</li></ul>
+  </div>
+  <div class="page-footer">
+    <span class="muted">软著鉴别材料：前30页 + 后30页（不足可重复）</span>
+  </div>
+</section>
+
+
+<section class="page">
+  <div class="page-header">
+    <div class="h1">SiteHub（个人网址导航系统） — 软件需求说明书（软著鉴别材料）</div>
+    <div class="meta">版本：V0.1.0　日期：2025年12月16日　单位：个人开发者</div>
+  </div>
+  <div class="page-body">
+    <h2>NFR-04 兼容性与可用性</h2>
+    <ul><li>适配桌面与移动端（响应式布局）</li>
+<li>触控拖拽与鼠标拖拽均可用</li>
+<li>中英文界面切换</li></ul>
+  </div>
+  <div class="page-footer">
+    <span class="muted">软著鉴别材料：前30页 + 后30页（不足可重复）</span>
+  </div>
+</section>
+
+
+<section class="page">
+  <div class="page-header">
+    <div class="h1">SiteHub（个人网址导航系统） — 软件需求说明书（软著鉴别材料）</div>
+    <div class="meta">版本：V0.1.0　日期：2025年12月16日　单位：个人开发者</div>
+  </div>
+  <div class="page-body">
+    <h2>约束与假设</h2>
+    <ul><li>依赖第三方服务可用性（Supabase/CloudBase/支付渠道）</li>
+<li>客户端需支持localStorage与现代JS特性</li>
+<li>支付相关流程需按各渠道文档配置密钥与回调地址</li></ul>
+  </div>
+  <div class="page-footer">
+    <span class="muted">软著鉴别材料：前30页 + 后30页（不足可重复）</span>
+  </div>
+</section>
+
+
+<section class="page">
+  <div class="page-header">
+    <div class="h1">SiteHub（个人网址导航系统） — 软件需求说明书（软著鉴别材料）</div>
+    <div class="meta">版本：V0.1.0　日期：2025年12月16日　单位：个人开发者</div>
+  </div>
+  <div class="page-body">
+    <h2>验收要点（摘要）</h2>
+    
+<table>
+  <thead><tr><th>编号</th><th>验收项</th><th>通过标准</th></tr></thead>
+  <tbody>
+    <tr><td>AC-01</td><td>站点展示</td><td>可正常展示内置站点并可分类浏览</td></tr>
+<tr><td>AC-02</td><td>搜索筛选</td><td>搜索与筛选组合生效</td></tr>
+<tr><td>AC-03</td><td>收藏</td><td>可加/取消收藏且状态可见</td></tr>
+<tr><td>AC-04</td><td>自定义站点</td><td>可新增/删除且避免重复</td></tr>
+<tr><td>AC-05</td><td>拖拽排序</td><td>拖拽后顺序可保存并恢复</td></tr>
+<tr><td>AC-06</td><td>访客倒计时</td><td>10分钟倒计时与到期提示生效</td></tr>
+  </tbody>
+</table>
+  </div>
+  <div class="page-footer">
+    <span class="muted">软著鉴别材料：前30页 + 后30页（不足可重复）</span>
+  </div>
+</section>
+
+
+<section class="page">
+  <div class="page-header">
+    <div class="h1">SiteHub（个人网址导航系统） — 软件需求说明书（软著鉴别材料）</div>
+    <div class="meta">版本：V0.1.0　日期：2025年12月16日　单位：个人开发者</div>
+  </div>
+  <div class="page-body">
+    <h2>附录A：接口与状态码（第1页）</h2>
+    
+    <p>本页为附录内容，用于软著材料补页。接口清单如下（节选）：</p>
+    
+<table>
+  <thead><tr><th>类型</th><th>路径</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td>Auth</td><td>/api/auth/email</td><td>Email认证</td></tr>
+<tr><td>Auth</td><td>/api/auth/wechat</td><td>微信认证</td></tr>
+<tr><td>Geo</td><td>/api/geo/detect</td><td>地区检测</td></tr>
+<tr><td>Pay</td><td>/api/payment/stripe/webhook</td><td>Stripe回调</td></tr>
+<tr><td>Pay</td><td>/api/payment/paypal/capture</td><td>PayPal扣款确认</td></tr>
+<tr><td>Pay</td><td>/api/payment/alipay/notify</td><td>支付宝回调</td></tr>
+<tr><td>Pay</td><td>/api/payment/wechat/notify</td><td>微信回调</td></tr>
+  </tbody>
+</table>
+    <p class="muted">状态码示例：200成功；400参数错误；401未认证；403无权限；500服务端异常。</p>
+    
+  </div>
+  <div class="page-footer">
+    <span class="muted">软著鉴别材料：前30页 + 后30页（不足可重复）</span>
+  </div>
+</section>
+
+
+<section class="page">
+  <div class="page-header">
+    <div class="h1">SiteHub（个人网址导航系统） — 软件需求说明书（软著鉴别材料）</div>
+    <div class="meta">版本：V0.1.0　日期：2025年12月16日　单位：个人开发者</div>
+  </div>
+  <div class="page-body">
+    <h2>附录A：接口与状态码（第2页）</h2>
+    
+    <p>本页为附录内容，用于软著材料补页。接口清单如下（节选）：</p>
+    
+<table>
+  <thead><tr><th>类型</th><th>路径</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td>Auth</td><td>/api/auth/email</td><td>Email认证</td></tr>
+<tr><td>Auth</td><td>/api/auth/wechat</td><td>微信认证</td></tr>
+<tr><td>Geo</td><td>/api/geo/detect</td><td>地区检测</td></tr>
+<tr><td>Pay</td><td>/api/payment/stripe/webhook</td><td>Stripe回调</td></tr>
+<tr><td>Pay</td><td>/api/payment/paypal/capture</td><td>PayPal扣款确认</td></tr>
+<tr><td>Pay</td><td>/api/payment/alipay/notify</td><td>支付宝回调</td></tr>
+<tr><td>Pay</td><td>/api/payment/wechat/notify</td><td>微信回调</td></tr>
+  </tbody>
+</table>
+    <p class="muted">状态码示例：200成功；400参数错误；401未认证；403无权限；500服务端异常。</p>
+    
+  </div>
+  <div class="page-footer">
+    <span class="muted">软著鉴别材料：前30页 + 后30页（不足可重复）</span>
+  </div>
+</section>
+
+
+<section class="page">
+  <div class="page-header">
+    <div class="h1">SiteHub（个人网址导航系统） — 软件需求说明书（软著鉴别材料）</div>
+    <div class="meta">版本：V0.1.0　日期：2025年12月16日　单位：个人开发者</div>
+  </div>
+  <div class="page-body">
+    <h2>附录A：接口与状态码（第51页）</h2>
+    
+    <p>本页为附录内容，用于软著材料补页。接口清单如下（节选）：</p>
+    
+<table>
+  <thead><tr><th>类型</th><th>路径</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td>Auth</td><td>/api/auth/email</td><td>Email认证</td></tr>
+<tr><td>Auth</td><td>/api/auth/wechat</td><td>微信认证</td></tr>
+<tr><td>Geo</td><td>/api/geo/detect</td><td>地区检测</td></tr>
+<tr><td>Pay</td><td>/api/payment/stripe/webhook</td><td>Stripe回调</td></tr>
+<tr><td>Pay</td><td>/api/payment/paypal/capture</td><td>PayPal扣款确认</td></tr>
+<tr><td>Pay</td><td>/api/payment/alipay/notify</td><td>支付宝回调</td></tr>
+<tr><td>Pay</td><td>/api/payment/wechat/notify</td><td>微信回调</td></tr>
+  </tbody>
+</table>
+    <p class="muted">状态码示例：200成功；400参数错误；401未认证；403无权限；500服务端异常。</p>
+    
+  </div>
+  <div class="page-footer">
+    <span class="muted">软著鉴别材料：前30页 + 后30页（不足可重复）</span>
+  </div>
+</section>
+
+
+<section class="page">
+  <div class="page-header">
+    <div class="h1">SiteHub（个人网址导航系统） — 软件需求说明书（软著鉴别材料）</div>
+    <div class="meta">版本：V0.1.0　日期：2025年12月16日　单位：个人开发者</div>
+  </div>
+  <div class="page-body">
+    <h2>附录A：接口与状态码（第52页）</h2>
+    
+    <p>本页为附录内容，用于软著材料补页。接口清单如下（节选）：</p>
+    
+<table>
+  <thead><tr><th>类型</th><th>路径</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td>Auth</td><td>/api/auth/email</td><td>Email认证</td></tr>
+<tr><td>Auth</td><td>/api/auth/wechat</td><td>微信认证</td></tr>
+<tr><td>Geo</td><td>/api/geo/detect</td><td>地区检测</td></tr>
+<tr><td>Pay</td><td>/api/payment/stripe/webhook</td><td>Stripe回调</td></tr>
+<tr><td>Pay</td><td>/api/payment/paypal/capture</td><td>PayPal扣款确认</td></tr>
+<tr><td>Pay</td><td>/api/payment/alipay/notify</td><td>支付宝回调</td></tr>
+<tr><td>Pay</td><td>/api/payment/wechat/notify</td><td>微信回调</td></tr>
+  </tbody>
+</table>
+    <p class="muted">状态码示例：200成功；400参数错误；401未认证；403无权限；500服务端异常。</p>
+    
+  </div>
+  <div class="page-footer">
+    <span class="muted">软著鉴别材料：前30页 + 后30页（不足可重复）</span>
+  </div>
+</section>
+
+
+<section class="page">
+  <div class="page-header">
+    <div class="h1">SiteHub（个人网址导航系统） — 软件需求说明书（软著鉴别材料）</div>
+    <div class="meta">版本：V0.1.0　日期：2025年12月16日　单位：个人开发者</div>
+  </div>
+  <div class="page-body">
+    <h2>附录A：接口与状态码（第53页）</h2>
+    
+    <p>本页为附录内容，用于软著材料补页。接口清单如下（节选）：</p>
+    
+<table>
+  <thead><tr><th>类型</th><th>路径</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td>Auth</td><td>/api/auth/email</td><td>Email认证</td></tr>
+<tr><td>Auth</td><td>/api/auth/wechat</td><td>微信认证</td></tr>
+<tr><td>Geo</td><td>/api/geo/detect</td><td>地区检测</td></tr>
+<tr><td>Pay</td><td>/api/payment/stripe/webhook</td><td>Stripe回调</td></tr>
+<tr><td>Pay</td><td>/api/payment/paypal/capture</td><td>PayPal扣款确认</td></tr>
+<tr><td>Pay</td><td>/api/payment/alipay/notify</td><td>支付宝回调</td></tr>
+<tr><td>Pay</td><td>/api/payment/wechat/notify</td><td>微信回调</td></tr>
+  </tbody>
+</table>
+    <p class="muted">状态码示例：200成功；400参数错误；401未认证；403无权限；500服务端异常。</p>
+    
+  </div>
+  <div class="page-footer">
+    <span class="muted">软著鉴别材料：前30页 + 后30页（不足可重复）</span>
+  </div>
+</section>
+
+
+<section class="page">
+  <div class="page-header">
+    <div class="h1">SiteHub（个人网址导航系统） — 软件需求说明书（软著鉴别材料）</div>
+    <div class="meta">版本：V0.1.0　日期：2025年12月16日　单位：个人开发者</div>
+  </div>
+  <div class="page-body">
+    <h2>附录A：接口与状态码（第54页）</h2>
+    
+    <p>本页为附录内容，用于软著材料补页。接口清单如下（节选）：</p>
+    
+<table>
+  <thead><tr><th>类型</th><th>路径</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td>Auth</td><td>/api/auth/email</td><td>Email认证</td></tr>
+<tr><td>Auth</td><td>/api/auth/wechat</td><td>微信认证</td></tr>
+<tr><td>Geo</td><td>/api/geo/detect</td><td>地区检测</td></tr>
+<tr><td>Pay</td><td>/api/payment/stripe/webhook</td><td>Stripe回调</td></tr>
+<tr><td>Pay</td><td>/api/payment/paypal/capture</td><td>PayPal扣款确认</td></tr>
+<tr><td>Pay</td><td>/api/payment/alipay/notify</td><td>支付宝回调</td></tr>
+<tr><td>Pay</td><td>/api/payment/wechat/notify</td><td>微信回调</td></tr>
+  </tbody>
+</table>
+    <p class="muted">状态码示例：200成功；400参数错误；401未认证；403无权限；500服务端异常。</p>
+    
+  </div>
+  <div class="page-footer">
+    <span class="muted">软著鉴别材料：前30页 + 后30页（不足可重复）</span>
+  </div>
+</section>
+
+
+<section class="page">
+  <div class="page-header">
+    <div class="h1">SiteHub（个人网址导航系统） — 软件需求说明书（软著鉴别材料）</div>
+    <div class="meta">版本：V0.1.0　日期：2025年12月16日　单位：个人开发者</div>
+  </div>
+  <div class="page-body">
+    <h2>附录A：接口与状态码（第55页）</h2>
+    
+    <p>本页为附录内容，用于软著材料补页。接口清单如下（节选）：</p>
+    
+<table>
+  <thead><tr><th>类型</th><th>路径</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td>Auth</td><td>/api/auth/email</td><td>Email认证</td></tr>
+<tr><td>Auth</td><td>/api/auth/wechat</td><td>微信认证</td></tr>
+<tr><td>Geo</td><td>/api/geo/detect</td><td>地区检测</td></tr>
+<tr><td>Pay</td><td>/api/payment/stripe/webhook</td><td>Stripe回调</td></tr>
+<tr><td>Pay</td><td>/api/payment/paypal/capture</td><td>PayPal扣款确认</td></tr>
+<tr><td>Pay</td><td>/api/payment/alipay/notify</td><td>支付宝回调</td></tr>
+<tr><td>Pay</td><td>/api/payment/wechat/notify</td><td>微信回调</td></tr>
+  </tbody>
+</table>
+    <p class="muted">状态码示例：200成功；400参数错误；401未认证；403无权限；500服务端异常。</p>
+    
+  </div>
+  <div class="page-footer">
+    <span class="muted">软著鉴别材料：前30页 + 后30页（不足可重复）</span>
+  </div>
+</section>
+
+
+<section class="page">
+  <div class="page-header">
+    <div class="h1">SiteHub（个人网址导航系统） — 软件需求说明书（软著鉴别材料）</div>
+    <div class="meta">版本：V0.1.0　日期：2025年12月16日　单位：个人开发者</div>
+  </div>
+  <div class="page-body">
+    <h2>附录A：接口与状态码（第56页）</h2>
+    
+    <p>本页为附录内容，用于软著材料补页。接口清单如下（节选）：</p>
+    
+<table>
+  <thead><tr><th>类型</th><th>路径</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td>Auth</td><td>/api/auth/email</td><td>Email认证</td></tr>
+<tr><td>Auth</td><td>/api/auth/wechat</td><td>微信认证</td></tr>
+<tr><td>Geo</td><td>/api/geo/detect</td><td>地区检测</td></tr>
+<tr><td>Pay</td><td>/api/payment/stripe/webhook</td><td>Stripe回调</td></tr>
+<tr><td>Pay</td><td>/api/payment/paypal/capture</td><td>PayPal扣款确认</td></tr>
+<tr><td>Pay</td><td>/api/payment/alipay/notify</td><td>支付宝回调</td></tr>
+<tr><td>Pay</td><td>/api/payment/wechat/notify</td><td>微信回调</td></tr>
+  </tbody>
+</table>
+    <p class="muted">状态码示例：200成功；400参数错误；401未认证；403无权限；500服务端异常。</p>
+    
+  </div>
+  <div class="page-footer">
+    <span class="muted">软著鉴别材料：前30页 + 后30页（不足可重复）</span>
+  </div>
+</section>
+
+
+<section class="page">
+  <div class="page-header">
+    <div class="h1">SiteHub（个人网址导航系统） — 软件需求说明书（软著鉴别材料）</div>
+    <div class="meta">版本：V0.1.0　日期：2025年12月16日　单位：个人开发者</div>
+  </div>
+  <div class="page-body">
+    <h2>附录A：接口与状态码（第57页）</h2>
+    
+    <p>本页为附录内容，用于软著材料补页。接口清单如下（节选）：</p>
+    
+<table>
+  <thead><tr><th>类型</th><th>路径</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td>Auth</td><td>/api/auth/email</td><td>Email认证</td></tr>
+<tr><td>Auth</td><td>/api/auth/wechat</td><td>微信认证</td></tr>
+<tr><td>Geo</td><td>/api/geo/detect</td><td>地区检测</td></tr>
+<tr><td>Pay</td><td>/api/payment/stripe/webhook</td><td>Stripe回调</td></tr>
+<tr><td>Pay</td><td>/api/payment/paypal/capture</td><td>PayPal扣款确认</td></tr>
+<tr><td>Pay</td><td>/api/payment/alipay/notify</td><td>支付宝回调</td></tr>
+<tr><td>Pay</td><td>/api/payment/wechat/notify</td><td>微信回调</td></tr>
+  </tbody>
+</table>
+    <p class="muted">状态码示例：200成功；400参数错误；401未认证；403无权限；500服务端异常。</p>
+    
+  </div>
+  <div class="page-footer">
+    <span class="muted">软著鉴别材料：前30页 + 后30页（不足可重复）</span>
+  </div>
+</section>
+
+
+<section class="page">
+  <div class="page-header">
+    <div class="h1">SiteHub（个人网址导航系统） — 软件需求说明书（软著鉴别材料）</div>
+    <div class="meta">版本：V0.1.0　日期：2025年12月16日　单位：个人开发者</div>
+  </div>
+  <div class="page-body">
+    <h2>附录A：接口与状态码（第58页）</h2>
+    
+    <p>本页为附录内容，用于软著材料补页。接口清单如下（节选）：</p>
+    
+<table>
+  <thead><tr><th>类型</th><th>路径</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td>Auth</td><td>/api/auth/email</td><td>Email认证</td></tr>
+<tr><td>Auth</td><td>/api/auth/wechat</td><td>微信认证</td></tr>
+<tr><td>Geo</td><td>/api/geo/detect</td><td>地区检测</td></tr>
+<tr><td>Pay</td><td>/api/payment/stripe/webhook</td><td>Stripe回调</td></tr>
+<tr><td>Pay</td><td>/api/payment/paypal/capture</td><td>PayPal扣款确认</td></tr>
+<tr><td>Pay</td><td>/api/payment/alipay/notify</td><td>支付宝回调</td></tr>
+<tr><td>Pay</td><td>/api/payment/wechat/notify</td><td>微信回调</td></tr>
+  </tbody>
+</table>
+    <p class="muted">状态码示例：200成功；400参数错误；401未认证；403无权限；500服务端异常。</p>
+    
+  </div>
+  <div class="page-footer">
+    <span class="muted">软著鉴别材料：前30页 + 后30页（不足可重复）</span>
+  </div>
+</section>
+
+
+<section class="page">
+  <div class="page-header">
+    <div class="h1">SiteHub（个人网址导航系统） — 软件需求说明书（软著鉴别材料）</div>
+    <div class="meta">版本：V0.1.0　日期：2025年12月16日　单位：个人开发者</div>
+  </div>
+  <div class="page-body">
+    <h2>附录A：接口与状态码（第59页）</h2>
+    
+    <p>本页为附录内容，用于软著材料补页。接口清单如下（节选）：</p>
+    
+<table>
+  <thead><tr><th>类型</th><th>路径</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td>Auth</td><td>/api/auth/email</td><td>Email认证</td></tr>
+<tr><td>Auth</td><td>/api/auth/wechat</td><td>微信认证</td></tr>
+<tr><td>Geo</td><td>/api/geo/detect</td><td>地区检测</td></tr>
+<tr><td>Pay</td><td>/api/payment/stripe/webhook</td><td>Stripe回调</td></tr>
+<tr><td>Pay</td><td>/api/payment/paypal/capture</td><td>PayPal扣款确认</td></tr>
+<tr><td>Pay</td><td>/api/payment/alipay/notify</td><td>支付宝回调</td></tr>
+<tr><td>Pay</td><td>/api/payment/wechat/notify</td><td>微信回调</td></tr>
+  </tbody>
+</table>
+    <p class="muted">状态码示例：200成功；400参数错误；401未认证；403无权限；500服务端异常。</p>
+    
+  </div>
+  <div class="page-footer">
+    <span class="muted">软著鉴别材料：前30页 + 后30页（不足可重复）</span>
+  </div>
+</section>
+
+
+<section class="page">
+  <div class="page-header">
+    <div class="h1">SiteHub（个人网址导航系统） — 软件需求说明书（软著鉴别材料）</div>
+    <div class="meta">版本：V0.1.0　日期：2025年12月16日　单位：个人开发者</div>
+  </div>
+  <div class="page-body">
+    <h2>附录A：接口与状态码（第60页）</h2>
+    
+    <p>本页为附录内容，用于软著材料补页。接口清单如下（节选）：</p>
+    
+<table>
+  <thead><tr><th>类型</th><th>路径</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td>Auth</td><td>/api/auth/email</td><td>Email认证</td></tr>
+<tr><td>Auth</td><td>/api/auth/wechat</td><td>微信认证</td></tr>
+<tr><td>Geo</td><td>/api/geo/detect</td><td>地区检测</td></tr>
+<tr><td>Pay</td><td>/api/payment/stripe/webhook</td><td>Stripe回调</td></tr>
+<tr><td>Pay</td><td>/api/payment/paypal/capture</td><td>PayPal扣款确认</td></tr>
+<tr><td>Pay</td><td>/api/payment/alipay/notify</td><td>支付宝回调</td></tr>
+<tr><td>Pay</td><td>/api/payment/wechat/notify</td><td>微信回调</td></tr>
+  </tbody>
+</table>
+    <p class="muted">状态码示例：200成功；400参数错误；401未认证；403无权限；500服务端异常。</p>
+    
+  </div>
+  <div class="page-footer">
+    <span class="muted">软著鉴别材料：前30页 + 后30页（不足可重复）</span>
+  </div>
+</section>
+
+
+<section class="page">
+  <div class="page-header">
+    <div class="h1">SiteHub（个人网址导航系统） — 软件需求说明书（软著鉴别材料）</div>
+    <div class="meta">版本：V0.1.0　日期：2025年12月16日　单位：个人开发者</div>
+  </div>
+  <div class="page-body">
+    <h2>附录A：接口与状态码（第61页）</h2>
+    
+    <p>本页为附录内容，用于软著材料补页。接口清单如下（节选）：</p>
+    
+<table>
+  <thead><tr><th>类型</th><th>路径</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td>Auth</td><td>/api/auth/email</td><td>Email认证</td></tr>
+<tr><td>Auth</td><td>/api/auth/wechat</td><td>微信认证</td></tr>
+<tr><td>Geo</td><td>/api/geo/detect</td><td>地区检测</td></tr>
+<tr><td>Pay</td><td>/api/payment/stripe/webhook</td><td>Stripe回调</td></tr>
+<tr><td>Pay</td><td>/api/payment/paypal/capture</td><td>PayPal扣款确认</td></tr>
+<tr><td>Pay</td><td>/api/payment/alipay/notify</td><td>支付宝回调</td></tr>
+<tr><td>Pay</td><td>/api/payment/wechat/notify</td><td>微信回调</td></tr>
+  </tbody>
+</table>
+    <p class="muted">状态码示例：200成功；400参数错误；401未认证；403无权限；500服务端异常。</p>
+    
+  </div>
+  <div class="page-footer">
+    <span class="muted">软著鉴别材料：前30页 + 后30页（不足可重复）</span>
+  </div>
+</section>
+
+
+<section class="page">
+  <div class="page-header">
+    <div class="h1">SiteHub（个人网址导航系统） — 软件需求说明书（软著鉴别材料）</div>
+    <div class="meta">版本：V0.1.0　日期：2025年12月16日　单位：个人开发者</div>
+  </div>
+  <div class="page-body">
+    <h2>附录A：接口与状态码（第62页）</h2>
+    
+    <p>本页为附录内容，用于软著材料补页。接口清单如下（节选）：</p>
+    
+<table>
+  <thead><tr><th>类型</th><th>路径</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td>Auth</td><td>/api/auth/email</td><td>Email认证</td></tr>
+<tr><td>Auth</td><td>/api/auth/wechat</td><td>微信认证</td></tr>
+<tr><td>Geo</td><td>/api/geo/detect</td><td>地区检测</td></tr>
+<tr><td>Pay</td><td>/api/payment/stripe/webhook</td><td>Stripe回调</td></tr>
+<tr><td>Pay</td><td>/api/payment/paypal/capture</td><td>PayPal扣款确认</td></tr>
+<tr><td>Pay</td><td>/api/payment/alipay/notify</td><td>支付宝回调</td></tr>
+<tr><td>Pay</td><td>/api/payment/wechat/notify</td><td>微信回调</td></tr>
+  </tbody>
+</table>
+    <p class="muted">状态码示例：200成功；400参数错误；401未认证；403无权限；500服务端异常。</p>
+    
+  </div>
+  <div class="page-footer">
+    <span class="muted">软著鉴别材料：前30页 + 后30页（不足可重复）</span>
+  </div>
+</section>
+
+
+<section class="page">
+  <div class="page-header">
+    <div class="h1">SiteHub（个人网址导航系统） — 软件需求说明书（软著鉴别材料）</div>
+    <div class="meta">版本：V0.1.0　日期：2025年12月16日　单位：个人开发者</div>
+  </div>
+  <div class="page-body">
+    <h2>附录A：接口与状态码（第63页）</h2>
+    
+    <p>本页为附录内容，用于软著材料补页。接口清单如下（节选）：</p>
+    
+<table>
+  <thead><tr><th>类型</th><th>路径</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td>Auth</td><td>/api/auth/email</td><td>Email认证</td></tr>
+<tr><td>Auth</td><td>/api/auth/wechat</td><td>微信认证</td></tr>
+<tr><td>Geo</td><td>/api/geo/detect</td><td>地区检测</td></tr>
+<tr><td>Pay</td><td>/api/payment/stripe/webhook</td><td>Stripe回调</td></tr>
+<tr><td>Pay</td><td>/api/payment/paypal/capture</td><td>PayPal扣款确认</td></tr>
+<tr><td>Pay</td><td>/api/payment/alipay/notify</td><td>支付宝回调</td></tr>
+<tr><td>Pay</td><td>/api/payment/wechat/notify</td><td>微信回调</td></tr>
+  </tbody>
+</table>
+    <p class="muted">状态码示例：200成功；400参数错误；401未认证；403无权限；500服务端异常。</p>
+    
+  </div>
+  <div class="page-footer">
+    <span class="muted">软著鉴别材料：前30页 + 后30页（不足可重复）</span>
+  </div>
+</section>
+
+
+<section class="page">
+  <div class="page-header">
+    <div class="h1">SiteHub（个人网址导航系统） — 软件需求说明书（软著鉴别材料）</div>
+    <div class="meta">版本：V0.1.0　日期：2025年12月16日　单位：个人开发者</div>
+  </div>
+  <div class="page-body">
+    <h2>附录A：接口与状态码（第64页）</h2>
+    
+    <p>本页为附录内容，用于软著材料补页。接口清单如下（节选）：</p>
+    
+<table>
+  <thead><tr><th>类型</th><th>路径</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td>Auth</td><td>/api/auth/email</td><td>Email认证</td></tr>
+<tr><td>Auth</td><td>/api/auth/wechat</td><td>微信认证</td></tr>
+<tr><td>Geo</td><td>/api/geo/detect</td><td>地区检测</td></tr>
+<tr><td>Pay</td><td>/api/payment/stripe/webhook</td><td>Stripe回调</td></tr>
+<tr><td>Pay</td><td>/api/payment/paypal/capture</td><td>PayPal扣款确认</td></tr>
+<tr><td>Pay</td><td>/api/payment/alipay/notify</td><td>支付宝回调</td></tr>
+<tr><td>Pay</td><td>/api/payment/wechat/notify</td><td>微信回调</td></tr>
+  </tbody>
+</table>
+    <p class="muted">状态码示例：200成功；400参数错误；401未认证；403无权限；500服务端异常。</p>
+    
+  </div>
+  <div class="page-footer">
+    <span class="muted">软著鉴别材料：前30页 + 后30页（不足可重复）</span>
+  </div>
+</section>
+
+
+<section class="page">
+  <div class="page-header">
+    <div class="h1">SiteHub（个人网址导航系统） — 软件需求说明书（软著鉴别材料）</div>
+    <div class="meta">版本：V0.1.0　日期：2025年12月16日　单位：个人开发者</div>
+  </div>
+  <div class="page-body">
+    <h2>附录A：接口与状态码（第65页）</h2>
+    
+    <p>本页为附录内容，用于软著材料补页。接口清单如下（节选）：</p>
+    
+<table>
+  <thead><tr><th>类型</th><th>路径</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td>Auth</td><td>/api/auth/email</td><td>Email认证</td></tr>
+<tr><td>Auth</td><td>/api/auth/wechat</td><td>微信认证</td></tr>
+<tr><td>Geo</td><td>/api/geo/detect</td><td>地区检测</td></tr>
+<tr><td>Pay</td><td>/api/payment/stripe/webhook</td><td>Stripe回调</td></tr>
+<tr><td>Pay</td><td>/api/payment/paypal/capture</td><td>PayPal扣款确认</td></tr>
+<tr><td>Pay</td><td>/api/payment/alipay/notify</td><td>支付宝回调</td></tr>
+<tr><td>Pay</td><td>/api/payment/wechat/notify</td><td>微信回调</td></tr>
+  </tbody>
+</table>
+    <p class="muted">状态码示例：200成功；400参数错误；401未认证；403无权限；500服务端异常。</p>
+    
+  </div>
+  <div class="page-footer">
+    <span class="muted">软著鉴别材料：前30页 + 后30页（不足可重复）</span>
+  </div>
+</section>
+
+
+<section class="page">
+  <div class="page-header">
+    <div class="h1">SiteHub（个人网址导航系统） — 软件需求说明书（软著鉴别材料）</div>
+    <div class="meta">版本：V0.1.0　日期：2025年12月16日　单位：个人开发者</div>
+  </div>
+  <div class="page-body">
+    <h2>附录A：接口与状态码（第66页）</h2>
+    
+    <p>本页为附录内容，用于软著材料补页。接口清单如下（节选）：</p>
+    
+<table>
+  <thead><tr><th>类型</th><th>路径</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td>Auth</td><td>/api/auth/email</td><td>Email认证</td></tr>
+<tr><td>Auth</td><td>/api/auth/wechat</td><td>微信认证</td></tr>
+<tr><td>Geo</td><td>/api/geo/detect</td><td>地区检测</td></tr>
+<tr><td>Pay</td><td>/api/payment/stripe/webhook</td><td>Stripe回调</td></tr>
+<tr><td>Pay</td><td>/api/payment/paypal/capture</td><td>PayPal扣款确认</td></tr>
+<tr><td>Pay</td><td>/api/payment/alipay/notify</td><td>支付宝回调</td></tr>
+<tr><td>Pay</td><td>/api/payment/wechat/notify</td><td>微信回调</td></tr>
+  </tbody>
+</table>
+    <p class="muted">状态码示例：200成功；400参数错误；401未认证；403无权限；500服务端异常。</p>
+    
+  </div>
+  <div class="page-footer">
+    <span class="muted">软著鉴别材料：前30页 + 后30页（不足可重复）</span>
+  </div>
+</section>
+
+
+<section class="page">
+  <div class="page-header">
+    <div class="h1">SiteHub（个人网址导航系统） — 软件需求说明书（软著鉴别材料）</div>
+    <div class="meta">版本：V0.1.0　日期：2025年12月16日　单位：个人开发者</div>
+  </div>
+  <div class="page-body">
+    <h2>附录A：接口与状态码（第67页）</h2>
+    
+    <p>本页为附录内容，用于软著材料补页。接口清单如下（节选）：</p>
+    
+<table>
+  <thead><tr><th>类型</th><th>路径</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td>Auth</td><td>/api/auth/email</td><td>Email认证</td></tr>
+<tr><td>Auth</td><td>/api/auth/wechat</td><td>微信认证</td></tr>
+<tr><td>Geo</td><td>/api/geo/detect</td><td>地区检测</td></tr>
+<tr><td>Pay</td><td>/api/payment/stripe/webhook</td><td>Stripe回调</td></tr>
+<tr><td>Pay</td><td>/api/payment/paypal/capture</td><td>PayPal扣款确认</td></tr>
+<tr><td>Pay</td><td>/api/payment/alipay/notify</td><td>支付宝回调</td></tr>
+<tr><td>Pay</td><td>/api/payment/wechat/notify</td><td>微信回调</td></tr>
+  </tbody>
+</table>
+    <p class="muted">状态码示例：200成功；400参数错误；401未认证；403无权限；500服务端异常。</p>
+    
+  </div>
+  <div class="page-footer">
+    <span class="muted">软著鉴别材料：前30页 + 后30页（不足可重复）</span>
+  </div>
+</section>
+
+
+<section class="page">
+  <div class="page-header">
+    <div class="h1">SiteHub（个人网址导航系统） — 软件需求说明书（软著鉴别材料）</div>
+    <div class="meta">版本：V0.1.0　日期：2025年12月16日　单位：个人开发者</div>
+  </div>
+  <div class="page-body">
+    <h2>附录A：接口与状态码（第68页）</h2>
+    
+    <p>本页为附录内容，用于软著材料补页。接口清单如下（节选）：</p>
+    
+<table>
+  <thead><tr><th>类型</th><th>路径</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td>Auth</td><td>/api/auth/email</td><td>Email认证</td></tr>
+<tr><td>Auth</td><td>/api/auth/wechat</td><td>微信认证</td></tr>
+<tr><td>Geo</td><td>/api/geo/detect</td><td>地区检测</td></tr>
+<tr><td>Pay</td><td>/api/payment/stripe/webhook</td><td>Stripe回调</td></tr>
+<tr><td>Pay</td><td>/api/payment/paypal/capture</td><td>PayPal扣款确认</td></tr>
+<tr><td>Pay</td><td>/api/payment/alipay/notify</td><td>支付宝回调</td></tr>
+<tr><td>Pay</td><td>/api/payment/wechat/notify</td><td>微信回调</td></tr>
+  </tbody>
+</table>
+    <p class="muted">状态码示例：200成功；400参数错误；401未认证；403无权限；500服务端异常。</p>
+    
+  </div>
+  <div class="page-footer">
+    <span class="muted">软著鉴别材料：前30页 + 后30页（不足可重复）</span>
+  </div>
+</section>
+
+
+<section class="page">
+  <div class="page-header">
+    <div class="h1">SiteHub（个人网址导航系统） — 软件需求说明书（软著鉴别材料）</div>
+    <div class="meta">版本：V0.1.0　日期：2025年12月16日　单位：个人开发者</div>
+  </div>
+  <div class="page-body">
+    <h2>附录A：接口与状态码（第69页）</h2>
+    
+    <p>本页为附录内容，用于软著材料补页。接口清单如下（节选）：</p>
+    
+<table>
+  <thead><tr><th>类型</th><th>路径</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td>Auth</td><td>/api/auth/email</td><td>Email认证</td></tr>
+<tr><td>Auth</td><td>/api/auth/wechat</td><td>微信认证</td></tr>
+<tr><td>Geo</td><td>/api/geo/detect</td><td>地区检测</td></tr>
+<tr><td>Pay</td><td>/api/payment/stripe/webhook</td><td>Stripe回调</td></tr>
+<tr><td>Pay</td><td>/api/payment/paypal/capture</td><td>PayPal扣款确认</td></tr>
+<tr><td>Pay</td><td>/api/payment/alipay/notify</td><td>支付宝回调</td></tr>
+<tr><td>Pay</td><td>/api/payment/wechat/notify</td><td>微信回调</td></tr>
+  </tbody>
+</table>
+    <p class="muted">状态码示例：200成功；400参数错误；401未认证；403无权限；500服务端异常。</p>
+    
+  </div>
+  <div class="page-footer">
+    <span class="muted">软著鉴别材料：前30页 + 后30页（不足可重复）</span>
+  </div>
+</section>
+
+
+<section class="page">
+  <div class="page-header">
+    <div class="h1">SiteHub（个人网址导航系统） — 软件需求说明书（软著鉴别材料）</div>
+    <div class="meta">版本：V0.1.0　日期：2025年12月16日　单位：个人开发者</div>
+  </div>
+  <div class="page-body">
+    <h2>附录A：接口与状态码（第70页）</h2>
+    
+    <p>本页为附录内容，用于软著材料补页。接口清单如下（节选）：</p>
+    
+<table>
+  <thead><tr><th>类型</th><th>路径</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td>Auth</td><td>/api/auth/email</td><td>Email认证</td></tr>
+<tr><td>Auth</td><td>/api/auth/wechat</td><td>微信认证</td></tr>
+<tr><td>Geo</td><td>/api/geo/detect</td><td>地区检测</td></tr>
+<tr><td>Pay</td><td>/api/payment/stripe/webhook</td><td>Stripe回调</td></tr>
+<tr><td>Pay</td><td>/api/payment/paypal/capture</td><td>PayPal扣款确认</td></tr>
+<tr><td>Pay</td><td>/api/payment/alipay/notify</td><td>支付宝回调</td></tr>
+<tr><td>Pay</td><td>/api/payment/wechat/notify</td><td>微信回调</td></tr>
+  </tbody>
+</table>
+    <p class="muted">状态码示例：200成功；400参数错误；401未认证；403无权限；500服务端异常。</p>
+    
+  </div>
+  <div class="page-footer">
+    <span class="muted">软著鉴别材料：前30页 + 后30页（不足可重复）</span>
+  </div>
+</section>
+
+
+<section class="page">
+  <div class="page-header">
+    <div class="h1">SiteHub（个人网址导航系统） — 软件需求说明书（软著鉴别材料）</div>
+    <div class="meta">版本：V0.1.0　日期：2025年12月16日　单位：个人开发者</div>
+  </div>
+  <div class="page-body">
+    <h2>附录A：接口与状态码（第71页）</h2>
+    
+    <p>本页为附录内容，用于软著材料补页。接口清单如下（节选）：</p>
+    
+<table>
+  <thead><tr><th>类型</th><th>路径</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td>Auth</td><td>/api/auth/email</td><td>Email认证</td></tr>
+<tr><td>Auth</td><td>/api/auth/wechat</td><td>微信认证</td></tr>
+<tr><td>Geo</td><td>/api/geo/detect</td><td>地区检测</td></tr>
+<tr><td>Pay</td><td>/api/payment/stripe/webhook</td><td>Stripe回调</td></tr>
+<tr><td>Pay</td><td>/api/payment/paypal/capture</td><td>PayPal扣款确认</td></tr>
+<tr><td>Pay</td><td>/api/payment/alipay/notify</td><td>支付宝回调</td></tr>
+<tr><td>Pay</td><td>/api/payment/wechat/notify</td><td>微信回调</td></tr>
+  </tbody>
+</table>
+    <p class="muted">状态码示例：200成功；400参数错误；401未认证；403无权限；500服务端异常。</p>
+    
+  </div>
+  <div class="page-footer">
+    <span class="muted">软著鉴别材料：前30页 + 后30页（不足可重复）</span>
+  </div>
+</section>
+
+
+<section class="page">
+  <div class="page-header">
+    <div class="h1">SiteHub（个人网址导航系统） — 软件需求说明书（软著鉴别材料）</div>
+    <div class="meta">版本：V0.1.0　日期：2025年12月16日　单位：个人开发者</div>
+  </div>
+  <div class="page-body">
+    <h2>附录A：接口与状态码（第72页）</h2>
+    
+    <p>本页为附录内容，用于软著材料补页。接口清单如下（节选）：</p>
+    
+<table>
+  <thead><tr><th>类型</th><th>路径</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td>Auth</td><td>/api/auth/email</td><td>Email认证</td></tr>
+<tr><td>Auth</td><td>/api/auth/wechat</td><td>微信认证</td></tr>
+<tr><td>Geo</td><td>/api/geo/detect</td><td>地区检测</td></tr>
+<tr><td>Pay</td><td>/api/payment/stripe/webhook</td><td>Stripe回调</td></tr>
+<tr><td>Pay</td><td>/api/payment/paypal/capture</td><td>PayPal扣款确认</td></tr>
+<tr><td>Pay</td><td>/api/payment/alipay/notify</td><td>支付宝回调</td></tr>
+<tr><td>Pay</td><td>/api/payment/wechat/notify</td><td>微信回调</td></tr>
+  </tbody>
+</table>
+    <p class="muted">状态码示例：200成功；400参数错误；401未认证；403无权限；500服务端异常。</p>
+    
+  </div>
+  <div class="page-footer">
+    <span class="muted">软著鉴别材料：前30页 + 后30页（不足可重复）</span>
+  </div>
+</section>
+
+
+<section class="page">
+  <div class="page-header">
+    <div class="h1">SiteHub（个人网址导航系统） — 软件需求说明书（软著鉴别材料）</div>
+    <div class="meta">版本：V0.1.0　日期：2025年12月16日　单位：个人开发者</div>
+  </div>
+  <div class="page-body">
+    <h2>附录A：接口与状态码（第73页）</h2>
+    
+    <p>本页为附录内容，用于软著材料补页。接口清单如下（节选）：</p>
+    
+<table>
+  <thead><tr><th>类型</th><th>路径</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td>Auth</td><td>/api/auth/email</td><td>Email认证</td></tr>
+<tr><td>Auth</td><td>/api/auth/wechat</td><td>微信认证</td></tr>
+<tr><td>Geo</td><td>/api/geo/detect</td><td>地区检测</td></tr>
+<tr><td>Pay</td><td>/api/payment/stripe/webhook</td><td>Stripe回调</td></tr>
+<tr><td>Pay</td><td>/api/payment/paypal/capture</td><td>PayPal扣款确认</td></tr>
+<tr><td>Pay</td><td>/api/payment/alipay/notify</td><td>支付宝回调</td></tr>
+<tr><td>Pay</td><td>/api/payment/wechat/notify</td><td>微信回调</td></tr>
+  </tbody>
+</table>
+    <p class="muted">状态码示例：200成功；400参数错误；401未认证；403无权限；500服务端异常。</p>
+    
+  </div>
+  <div class="page-footer">
+    <span class="muted">软著鉴别材料：前30页 + 后30页（不足可重复）</span>
+  </div>
+</section>
+
+
+<section class="page">
+  <div class="page-header">
+    <div class="h1">SiteHub（个人网址导航系统） — 软件需求说明书（软著鉴别材料）</div>
+    <div class="meta">版本：V0.1.0　日期：2025年12月16日　单位：个人开发者</div>
+  </div>
+  <div class="page-body">
+    <h2>附录A：接口与状态码（第74页）</h2>
+    
+    <p>本页为附录内容，用于软著材料补页。接口清单如下（节选）：</p>
+    
+<table>
+  <thead><tr><th>类型</th><th>路径</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td>Auth</td><td>/api/auth/email</td><td>Email认证</td></tr>
+<tr><td>Auth</td><td>/api/auth/wechat</td><td>微信认证</td></tr>
+<tr><td>Geo</td><td>/api/geo/detect</td><td>地区检测</td></tr>
+<tr><td>Pay</td><td>/api/payment/stripe/webhook</td><td>Stripe回调</td></tr>
+<tr><td>Pay</td><td>/api/payment/paypal/capture</td><td>PayPal扣款确认</td></tr>
+<tr><td>Pay</td><td>/api/payment/alipay/notify</td><td>支付宝回调</td></tr>
+<tr><td>Pay</td><td>/api/payment/wechat/notify</td><td>微信回调</td></tr>
+  </tbody>
+</table>
+    <p class="muted">状态码示例：200成功；400参数错误；401未认证；403无权限；500服务端异常。</p>
+    
+  </div>
+  <div class="page-footer">
+    <span class="muted">软著鉴别材料：前30页 + 后30页（不足可重复）</span>
+  </div>
+</section>
+
+
+<section class="page">
+  <div class="page-header">
+    <div class="h1">SiteHub（个人网址导航系统） — 软件需求说明书（软著鉴别材料）</div>
+    <div class="meta">版本：V0.1.0　日期：2025年12月16日　单位：个人开发者</div>
+  </div>
+  <div class="page-body">
+    <h2>附录A：接口与状态码（第75页）</h2>
+    
+    <p>本页为附录内容，用于软著材料补页。接口清单如下（节选）：</p>
+    
+<table>
+  <thead><tr><th>类型</th><th>路径</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td>Auth</td><td>/api/auth/email</td><td>Email认证</td></tr>
+<tr><td>Auth</td><td>/api/auth/wechat</td><td>微信认证</td></tr>
+<tr><td>Geo</td><td>/api/geo/detect</td><td>地区检测</td></tr>
+<tr><td>Pay</td><td>/api/payment/stripe/webhook</td><td>Stripe回调</td></tr>
+<tr><td>Pay</td><td>/api/payment/paypal/capture</td><td>PayPal扣款确认</td></tr>
+<tr><td>Pay</td><td>/api/payment/alipay/notify</td><td>支付宝回调</td></tr>
+<tr><td>Pay</td><td>/api/payment/wechat/notify</td><td>微信回调</td></tr>
+  </tbody>
+</table>
+    <p class="muted">状态码示例：200成功；400参数错误；401未认证；403无权限；500服务端异常。</p>
+    
+  </div>
+  <div class="page-footer">
+    <span class="muted">软著鉴别材料：前30页 + 后30页（不足可重复）</span>
+  </div>
+</section>
+
+
+<section class="page">
+  <div class="page-header">
+    <div class="h1">SiteHub（个人网址导航系统） — 软件需求说明书（软著鉴别材料）</div>
+    <div class="meta">版本：V0.1.0　日期：2025年12月16日　单位：个人开发者</div>
+  </div>
+  <div class="page-body">
+    <h2>附录A：接口与状态码（第76页）</h2>
+    
+    <p>本页为附录内容，用于软著材料补页。接口清单如下（节选）：</p>
+    
+<table>
+  <thead><tr><th>类型</th><th>路径</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td>Auth</td><td>/api/auth/email</td><td>Email认证</td></tr>
+<tr><td>Auth</td><td>/api/auth/wechat</td><td>微信认证</td></tr>
+<tr><td>Geo</td><td>/api/geo/detect</td><td>地区检测</td></tr>
+<tr><td>Pay</td><td>/api/payment/stripe/webhook</td><td>Stripe回调</td></tr>
+<tr><td>Pay</td><td>/api/payment/paypal/capture</td><td>PayPal扣款确认</td></tr>
+<tr><td>Pay</td><td>/api/payment/alipay/notify</td><td>支付宝回调</td></tr>
+<tr><td>Pay</td><td>/api/payment/wechat/notify</td><td>微信回调</td></tr>
+  </tbody>
+</table>
+    <p class="muted">状态码示例：200成功；400参数错误；401未认证；403无权限；500服务端异常。</p>
+    
+  </div>
+  <div class="page-footer">
+    <span class="muted">软著鉴别材料：前30页 + 后30页（不足可重复）</span>
+  </div>
+</section>
+
+
+<section class="page">
+  <div class="page-header">
+    <div class="h1">SiteHub（个人网址导航系统） — 软件需求说明书（软著鉴别材料）</div>
+    <div class="meta">版本：V0.1.0　日期：2025年12月16日　单位：个人开发者</div>
+  </div>
+  <div class="page-body">
+    <h2>附录A：接口与状态码（第77页）</h2>
+    
+    <p>本页为附录内容，用于软著材料补页。接口清单如下（节选）：</p>
+    
+<table>
+  <thead><tr><th>类型</th><th>路径</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td>Auth</td><td>/api/auth/email</td><td>Email认证</td></tr>
+<tr><td>Auth</td><td>/api/auth/wechat</td><td>微信认证</td></tr>
+<tr><td>Geo</td><td>/api/geo/detect</td><td>地区检测</td></tr>
+<tr><td>Pay</td><td>/api/payment/stripe/webhook</td><td>Stripe回调</td></tr>
+<tr><td>Pay</td><td>/api/payment/paypal/capture</td><td>PayPal扣款确认</td></tr>
+<tr><td>Pay</td><td>/api/payment/alipay/notify</td><td>支付宝回调</td></tr>
+<tr><td>Pay</td><td>/api/payment/wechat/notify</td><td>微信回调</td></tr>
+  </tbody>
+</table>
+    <p class="muted">状态码示例：200成功；400参数错误；401未认证；403无权限；500服务端异常。</p>
+    
+  </div>
+  <div class="page-footer">
+    <span class="muted">软著鉴别材料：前30页 + 后30页（不足可重复）</span>
+  </div>
+</section>
+
+
+<section class="page">
+  <div class="page-header">
+    <div class="h1">SiteHub（个人网址导航系统） — 软件需求说明书（软著鉴别材料）</div>
+    <div class="meta">版本：V0.1.0　日期：2025年12月16日　单位：个人开发者</div>
+  </div>
+  <div class="page-body">
+    <h2>附录A：接口与状态码（第78页）</h2>
+    
+    <p>本页为附录内容，用于软著材料补页。接口清单如下（节选）：</p>
+    
+<table>
+  <thead><tr><th>类型</th><th>路径</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td>Auth</td><td>/api/auth/email</td><td>Email认证</td></tr>
+<tr><td>Auth</td><td>/api/auth/wechat</td><td>微信认证</td></tr>
+<tr><td>Geo</td><td>/api/geo/detect</td><td>地区检测</td></tr>
+<tr><td>Pay</td><td>/api/payment/stripe/webhook</td><td>Stripe回调</td></tr>
+<tr><td>Pay</td><td>/api/payment/paypal/capture</td><td>PayPal扣款确认</td></tr>
+<tr><td>Pay</td><td>/api/payment/alipay/notify</td><td>支付宝回调</td></tr>
+<tr><td>Pay</td><td>/api/payment/wechat/notify</td><td>微信回调</td></tr>
+  </tbody>
+</table>
+    <p class="muted">状态码示例：200成功；400参数错误；401未认证；403无权限；500服务端异常。</p>
+    
+  </div>
+  <div class="page-footer">
+    <span class="muted">软著鉴别材料：前30页 + 后30页（不足可重复）</span>
+  </div>
+</section>
+
+
+<section class="page">
+  <div class="page-header">
+    <div class="h1">SiteHub（个人网址导航系统） — 软件需求说明书（软著鉴别材料）</div>
+    <div class="meta">版本：V0.1.0　日期：2025年12月16日　单位：个人开发者</div>
+  </div>
+  <div class="page-body">
+    <h2>附录A：接口与状态码（第79页）</h2>
+    
+    <p>本页为附录内容，用于软著材料补页。接口清单如下（节选）：</p>
+    
+<table>
+  <thead><tr><th>类型</th><th>路径</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td>Auth</td><td>/api/auth/email</td><td>Email认证</td></tr>
+<tr><td>Auth</td><td>/api/auth/wechat</td><td>微信认证</td></tr>
+<tr><td>Geo</td><td>/api/geo/detect</td><td>地区检测</td></tr>
+<tr><td>Pay</td><td>/api/payment/stripe/webhook</td><td>Stripe回调</td></tr>
+<tr><td>Pay</td><td>/api/payment/paypal/capture</td><td>PayPal扣款确认</td></tr>
+<tr><td>Pay</td><td>/api/payment/alipay/notify</td><td>支付宝回调</td></tr>
+<tr><td>Pay</td><td>/api/payment/wechat/notify</td><td>微信回调</td></tr>
+  </tbody>
+</table>
+    <p class="muted">状态码示例：200成功；400参数错误；401未认证；403无权限；500服务端异常。</p>
+    
+  </div>
+  <div class="page-footer">
+    <span class="muted">软著鉴别材料：前30页 + 后30页（不足可重复）</span>
+  </div>
+</section>
+
+
+<section class="page">
+  <div class="page-header">
+    <div class="h1">SiteHub（个人网址导航系统） — 软件需求说明书（软著鉴别材料）</div>
+    <div class="meta">版本：V0.1.0　日期：2025年12月16日　单位：个人开发者</div>
+  </div>
+  <div class="page-body">
+    <h2>附录A：接口与状态码（第80页）</h2>
+    
+    <p>本页为附录内容，用于软著材料补页。接口清单如下（节选）：</p>
+    
+<table>
+  <thead><tr><th>类型</th><th>路径</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td>Auth</td><td>/api/auth/email</td><td>Email认证</td></tr>
+<tr><td>Auth</td><td>/api/auth/wechat</td><td>微信认证</td></tr>
+<tr><td>Geo</td><td>/api/geo/detect</td><td>地区检测</td></tr>
+<tr><td>Pay</td><td>/api/payment/stripe/webhook</td><td>Stripe回调</td></tr>
+<tr><td>Pay</td><td>/api/payment/paypal/capture</td><td>PayPal扣款确认</td></tr>
+<tr><td>Pay</td><td>/api/payment/alipay/notify</td><td>支付宝回调</td></tr>
+<tr><td>Pay</td><td>/api/payment/wechat/notify</td><td>微信回调</td></tr>
+  </tbody>
+</table>
+    <p class="muted">状态码示例：200成功；400参数错误；401未认证；403无权限；500服务端异常。</p>
+    
+  </div>
+  <div class="page-footer">
+    <span class="muted">软著鉴别材料：前30页 + 后30页（不足可重复）</span>
+  </div>
+</section>
+
+</body>
+</html>

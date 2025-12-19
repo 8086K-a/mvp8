@@ -17,26 +17,80 @@ export default function PaymentSuccessPage() {
 
   useEffect(() => {
     if (sessionId) {
-      // ===== Stripe 支付验证 =====
-      console.log('🔵 Stripe payment verification...')
-      fetch(`/api/payment/stripe/check?session_id=${sessionId}`)
-        .then((res) => res.json())
-        .then((data) => {
-          if (data.status === 'paid') {
-            console.log('✅ Stripe payment verified')
-            setSuccess(true)
-          } else {
-            console.error('❌ Stripe payment not completed:', data)
-            setErrorMessage('Payment verification failed')
-          }
-        })
-        .catch((error) => {
-          console.error('❌ Stripe verification error:', error)
-          setErrorMessage('Payment verification error')
-        })
-        .finally(() => {
-          setVerifying(false)
-        })
+      // 检查session_id是否为支付宝格式（以pay_开头）
+      const isAlipaySession = sessionId.startsWith('pay_')
+
+      if (isAlipaySession) {
+        // ===== 支付宝支付验证 =====
+        console.log('🔵 Alipay payment verification...', sessionId)
+        fetch(`/api/payment/alipay/verify?out_trade_no=${sessionId}`)
+          .then((res) => res.json())
+          .then(async (data) => {
+            if (data.success && data.trade_status === 'TRADE_SUCCESS') {
+              console.log('✅ Alipay payment verified')
+
+              // 支付成功后刷新用户状态
+              try {
+                const userId = localStorage.getItem('user_id')
+                if (userId) {
+                  console.log('🔄 Refreshing user status after payment...')
+                  const refreshRes = await fetch('/api/user/refresh-status', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId })
+                  })
+                  const refreshData = await refreshRes.json()
+
+                  if (refreshData.success) {
+                    // 更新本地存储的用户信息
+                    const userInfoStr = localStorage.getItem('user_info')
+                    if (userInfoStr) {
+                      const userInfo = JSON.parse(userInfoStr)
+                      userInfo.pro = refreshData.pro
+                      localStorage.setItem('user_info', JSON.stringify(userInfo))
+                      console.log('✅ User status updated in localStorage')
+                    }
+                  }
+                }
+              } catch (refreshError) {
+                console.warn('⚠️ Failed to refresh user status:', refreshError)
+              }
+
+              setSuccess(true)
+            } else {
+              console.error('❌ Alipay payment not completed:', data)
+              setErrorMessage(data.error || 'Payment verification failed')
+            }
+          })
+          .catch((error) => {
+            console.error('❌ Alipay verification error:', error)
+            setErrorMessage('Payment verification error')
+          })
+          .finally(() => {
+            setVerifying(false)
+          })
+      } else {
+        // ===== Stripe 支付验证 =====
+        console.log('🔵 Stripe payment verification...')
+        fetch(`/api/payment/stripe/check?session_id=${sessionId}`)
+          .then((res) => res.json())
+          .then((data) => {
+            if (data.status === 'paid') {
+              console.log('✅ Stripe payment verified')
+              setSuccess(true)
+            } else {
+              console.error('❌ Stripe payment not completed:', data)
+              setErrorMessage('Payment verification failed')
+            }
+          })
+          .catch((error) => {
+            console.error('❌ Stripe verification error:', error)
+            setErrorMessage('Payment verification error')
+          })
+          .finally(() => {
+            setVerifying(false)
+          })
+      }
     } else if (paypalToken) {
       // ===== PayPal 支付捕获 =====
       console.log('🟡 PayPal payment capture...')

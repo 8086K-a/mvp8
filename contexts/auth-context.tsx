@@ -55,13 +55,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             // ✅ 检查并刷新Token（多端持久化优化）
             await AuthTokenManager.checkAndRefreshToken()
 
+            // 重新检查订阅状态（确保会员状态是最新的）
+            let isPro = userInfo.pro || false
+            try {
+              if (userInfo.id) {
+                const response = await fetch('/api/user/refresh-status', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ userId: userInfo.id })
+                })
+                const statusData = await response.json()
+                if (statusData.success) {
+                  isPro = statusData.pro
+                  console.log("✅ [Session Restore]: Updated pro status from subscription check")
+                }
+              }
+            } catch (statusError) {
+              console.warn("⚠️ [Session Restore]: Failed to check subscription status:", statusError)
+            }
+
             // 创建国内用户对象
             const customUser: CustomUser = {
               type: "authenticated",
               name: userInfo.name || userInfo.email?.split('@')[0] || 'User',
               email: userInfo.email || '',
               customCount: 0,
-              pro: userInfo.pro || false,
+              pro: isPro,
               id: userInfo.id,
               provider: 'email'
             }

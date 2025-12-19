@@ -1,0 +1,2985 @@
+================================================================================
+软件著作权申请 - 源程序代码
+================================================================================
+项目名称: 个人网址导航系统
+提交时间: 2025年12月16日
+总行数: 34,569行
+总页数: 692页 (按50行/页计算)
+说明: 以下为源程序的前30页(第1-30页) + 后30页(第663-692页)
+
+================================================================================
+第 1-30 页 (前 30 页)
+================================================================================
+=== /Users/8086k/project/components/app/api/auth/email/route.ts ===
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
+import bcrypt from 'bcryptjs'
+import cloudbase from '@cloudbase/node-sdk'
+
+// 服务器端Supabase客户端（无需localStorage）
+function createServerClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+
+  return createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+      detectSessionInUrl: false
+    }
+  })
+}
+
+/**
+ * 邮箱登录/注册API
+ * 根据环境变量选择数据库：
+ * - NEXT_PUBLIC_DEPLOYMENT_REGION=china → 腾讯云CloudBase
+ * - NEXT_PUBLIC_DEPLOYMENT_REGION=overseas → Supabase
+ */
+
+// 从环境变量读取部署区域（默认为国内版）
+const DEPLOYMENT_REGION = process.env.NEXT_PUBLIC_DEPLOYMENT_REGION || 'china'
+const IS_CHINA_DEPLOYMENT = DEPLOYMENT_REGION === 'china'
+
+// 国内部署认证（使用腾讯云CloudBase数据库）
+async function cloudbaseEmailAuth(email: string, password: string, mode: 'login' | 'signup') {
+  try {
+    console.log('[国内部署] 使用腾讯云CloudBase数据库')
+
+    // 初始化CloudBase
+    const app = cloudbase.init({
+      env: process.env.NEXT_PUBLIC_WECHAT_CLOUDBASE_ID!,
+      secretId: process.env.CLOUDBASE_SECRET_ID!,
+      secretKey: process.env.CLOUDBASE_SECRET_KEY!
+    })
+
+    const db = app.database()
+    const usersCollection = db.collection('web_users')
+
+    if (mode === 'signup') {
+      // 检查邮箱是否已存在
+      const existingUser = await usersCollection.where({ email }).get()
+      if (existingUser.data && existingUser.data.length > 0) {
+        return { error: '该邮箱已被注册' }
+      }
+
+      // 加密密码
+      const hashedPassword = await bcrypt.hash(password, 10)
+
+      // 创建新用户
+      const newUser = {
+        email,
+        password: hashedPassword,
+        name: email.includes('@') ? email.split('@')[0] : email,
+        pro: false,
+        region: 'china',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }
+
+      const result = await usersCollection.add(newUser)
+
+      return {
+        user: {
+          id: result.id,
+          email,
+          name: newUser.name,
+          pro: false,
+          region: 'china'
+        }
+      }
+    } else {
+      // 登录：查找用户
+      const userResult = await usersCollection.where({ email }).get()
+
+      if (!userResult.data || userResult.data.length === 0) {
+        return { error: '用户不存在或密码错误' }
+      }
+
+      const user = userResult.data[0]
+
+      // 验证密码
+      const isPasswordValid = await bcrypt.compare(password, user.password)
+      if (!isPasswordValid) {
+        return { error: '用户不存在或密码错误' }
+      }
+
+      return {
+        user: {
+          id: user._id,
+          email: user.email,
+          name: user.name,
+          pro: user.pro || false,
+          region: 'china'
+        }
+      }
+    }
+  } catch (error) {
+    console.error('国内用户认证错误:', error)
+    return { error: '认证失败，请稍后重试' }
+  }
+}
+
+// 海外部署认证（Supabase，region标记为overseas）
+async function supabaseEmailAuth(email: string, password: string, mode: 'login' | 'signup') {
+  try {
+    console.log('[海外部署] 使用Supabase存储，region标记为overseas')
+
+    const supabase = createServerClient()
+
+    if (mode === 'signup') {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            region: 'overseas', // 标记为海外用户
+            full_name: email.split('@')[0],
+          }
+        }
+      })
+
+      if (error) {
+        console.error('海外用户注册错误:', error)
+        return { error: error.message }
+      }
+
+      if (!data.user) {
+        return { error: 'Registration failed' }
+      }
+
+      return {
+        user: {
+          id: data.user.id,
+          email: data.user.email || email,
+          name: email.split('@')[0],
+          pro: false,
+          region: 'overseas'
+        }
+      }
+    } else {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
+
+      if (error) {
+        console.error('海外用户登录错误:', error)
+        return { error: error.message }
+      }
+
+      if (!data.user) {
+        return { error: 'Login failed' }
+      }
+
+      return {
+        user: {
+          id: data.user.id,
+          email: data.user.email || email,
+          name: data.user.user_metadata?.full_name || email.split('@')[0],
+          pro: data.user.user_metadata?.pro || false,
+          region: data.user.user_metadata?.region || 'overseas'
+        }
+      }
+    }
+  } catch (error) {
+    console.error('海外用户认证错误:', error)
+    return { error: 'Authentication failed' }
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const { email, password, mode } = await request.json()
+
+    if (!email || !password) {
+      return NextResponse.json(
+        { error: '请填写完整信息' },
+        { status: 400 }
+      )
+    }
+
+    console.log(`📍 部署区域: ${DEPLOYMENT_REGION} → ${IS_CHINA_DEPLOYMENT ? '🇨🇳 国内版' : '🌍 海外版'}`)
+
+    // 验证密码长度
+    if (password.length < 6) {
+      return NextResponse.json(
+        { error: '密码至少6位' },
+        { status: 400 }
+      )
+    }
+
+    // 根据环境变量选择认证方式
+    let result
+    if (IS_CHINA_DEPLOYMENT) {
+      console.log('🔐 [国内版] 使用CloudBase数据库')
+      result = await cloudbaseEmailAuth(email, password, mode as 'login' | 'signup')
+    } else {
+      console.log('🔐 [海外版] 使用Supabase数据库')
+      result = await supabaseEmailAuth(email, password, mode as 'login' | 'signup')
+    }
+
+    if (result.error) {
+      return NextResponse.json(
+        { error: result.error },
+        { status: 400 }
+      )
+    }
+
+    return NextResponse.json({
+      success: true,
+      user: result.user,
+      database: IS_CHINA_DEPLOYMENT ? 'cloudbase' : 'supabase',
+      region: IS_CHINA_DEPLOYMENT ? 'china' : 'overseas'
+    })
+
+  } catch (error) {
+    console.error('邮箱认证API错误:', error)
+    return NextResponse.json(
+      { error: '服务器错误' },
+      { status: 500 }
+    )
+  }
+}
+=== /Users/8086k/project/components/app/api/auth/wechat/callback/route.ts ===
+import { NextRequest, NextResponse } from 'next/server'
+import cloudbase from '@cloudbase/node-sdk'
+import * as jwt from 'jsonwebtoken'
+
+/**
+ * 微信网页授权回调
+ * 文档：https://developers.weixin.qq.com/doc/offiaccount/OA_Web_Apps/Wechat_webpage_authorization.html
+ */
+export async function GET(req: NextRequest) {
+  try {
+    // 检查微信登录是否已配置
+    if (!process.env.WECHAT_APP_ID || !process.env.WECHAT_APP_SECRET) {
+      console.log('⚠️ [WeChat] 微信登录未配置，重定向到首页')
+      return NextResponse.redirect(
+        `${process.env.NEXT_PUBLIC_SITE_URL}/?error=wechat_not_configured`
+      )
+    }
+    const searchParams = req.nextUrl.searchParams
+    const code = searchParams.get('code')
+    const state = searchParams.get('state')
+
+    if (!code) {
+      return NextResponse.redirect(
+        `${process.env.NEXT_PUBLIC_SITE_URL}/?error=wechat_auth_failed`
+      )
+    }
+
+    // 通过code获取access_token
+    const tokenResponse = await fetch(
+      `https://api.weixin.qq.com/sns/oauth2/access_token?` +
+      `appid=${process.env.WECHAT_APP_ID}&` +
+      `secret=${process.env.WECHAT_APP_SECRET}&` +
+      `code=${code}&` +
+      `grant_type=authorization_code`
+    )
+
+    const tokenData = await tokenResponse.json()
+
+    if (tokenData.errcode) {
+      console.error('❌ 获取微信access_token失败:', tokenData)
+      return NextResponse.redirect(
+        `${process.env.NEXT_PUBLIC_SITE_URL}/?error=wechat_token_failed`
+      )
+    }
+
+    const { access_token, openid, refresh_token } = tokenData
+
+    // 获取用户信息
+    const userInfoResponse = await fetch(
+      `https://api.weixin.qq.com/sns/userinfo?` +
+      `access_token=${access_token}&` +
+      `openid=${openid}&` +
+      `lang=zh_CN`
+    )
+
+    const userInfo = await userInfoResponse.json()
+
+    if (userInfo.errcode) {
+      console.error('❌ 获取微信用户信息失败:', userInfo)
+      return NextResponse.redirect(
+        `${process.env.NEXT_PUBLIC_SITE_URL}/?error=wechat_userinfo_failed`
+      )
+    }
+
+    console.log('✅ 微信用户信息:', userInfo)
+
+    // 初始化CloudBase（服务端）
+    const app = cloudbase.init({
+      env: process.env.NEXT_PUBLIC_WECHAT_CLOUDBASE_ID!,
+      secretId: process.env.CLOUDBASE_SECRET_ID!,
+      secretKey: process.env.CLOUDBASE_SECRET_KEY!
+    })
+
+    const db = app.database()
+
+    // 保存/更新用户信息到腾讯云数据库
+    try {
+      // 查询是否已存在
+      const existingUser = await db
+        .collection('web_users')
+        .where({
+          _openid: openid,
+        })
+        .get()
+
+      const userData = {
+        _openid: openid,
+        nickname: userInfo.nickname,
+        avatar: userInfo.headimgurl,
+        province: userInfo.province,
+        city: userInfo.city,
+        country: userInfo.country,
+        sex: userInfo.sex,
+        name: userInfo.nickname, // 显示名称使用微信昵称
+        pro: false,
+        region: 'china',
+        loginType: 'wechat', // 标记为微信登录
+        updated_at: new Date(),
+      }
+
+      let userId: string
+      let isPro = false
+
+      if (existingUser.data && existingUser.data.length > 0) {
+        // 更新现有用户
+        userId = existingUser.data[0]._id
+        isPro = existingUser.data[0].pro || false // 保留原有会员状态
+        await db
+          .collection('web_users')
+          .doc(userId)
+          .update(userData)
+
+        console.log('✅ 更新微信用户成功:', userId, isPro ? '(会员)' : '(普通用户)')
+      } else {
+        // 创建新用户
+        const result = await db
+          .collection('web_users')
+          .add({
+            ...userData,
+            created_at: new Date(),
+          })
+
+        userId = result.id
+        console.log('✅ 创建微信用户成功:', userId)
+      }
+
+      // 生成 JWT Token
+      const tokenPayload = {
+        userId: userId,
+        openid: openid,
+        nickname: userInfo.nickname,
+        region: 'china',
+        loginType: 'wechat'
+      }
+
+      // ✅ 动态设置 Token 有效期：普通用户 30 天，高级会员 90 天（多端持久化优化）
+      const expiresIn = isPro ? '90d' : '30d'
+
+      const token = jwt.sign(
+        tokenPayload,
+        process.env.JWT_SECRET || 'fallback-secret-key-for-development-only',
+        { expiresIn: expiresIn }
+      )
+
+      console.log('✅ [JWT Token Generated]: For WeChat user', userInfo.nickname)
+
+      // 重定向回首页，并传递登录信息
+      const redirectUrl = new URL(process.env.NEXT_PUBLIC_SITE_URL!)
+      redirectUrl.searchParams.set('wechat_login', 'success')
+      redirectUrl.searchParams.set('token', token)
+      redirectUrl.searchParams.set('user', encodeURIComponent(JSON.stringify({
+        id: userId,
+        name: userInfo.nickname,
+        avatar: userInfo.headimgurl,
+        pro: false,
+        region: 'china',
+        loginType: 'wechat'
+      })))
+
+      return NextResponse.redirect(redirectUrl.toString())
+    } catch (error) {
+      console.error('❌ 保存微信用户信息失败:', error)
+      return NextResponse.redirect(
+        `${process.env.NEXT_PUBLIC_SITE_URL}/?error=save_user_failed`
+      )
+    }
+  } catch (error: any) {
+    console.error('❌ 微信登录回调处理失败:', error)
+    return NextResponse.redirect(
+      `${process.env.NEXT_PUBLIC_SITE_URL}/?error=wechat_callback_failed`
+    )
+  }
+}
+
+/**
+ * 发起微信网页授权
+ * 前端调用此接口跳转到微信授权页面
+ */
+export async function POST(req: NextRequest) {
+  try {
+    // ✅ 前端传入完整的 redirectUri（从 window.location.origin 获取）
+    const { redirectUri } = await req.json()
+
+    const appid = process.env.WECHAT_APP_ID
+
+    // 使用前端传入的 redirectUri（已包含完整域名）
+    const callbackUrl = redirectUri || `http://localhost:3000/api/auth/wechat/callback`
+
+    // 确保生产环境使用 HTTPS（微信开放平台要求）
+    let finalCallbackUrl = callbackUrl
+    if (!callbackUrl.includes('localhost') && callbackUrl.startsWith('http://')) {
+      finalCallbackUrl = callbackUrl.replace('http://', 'https://')
+      console.warn('⚠️ [WeChat] 自动将 HTTP 转换为 HTTPS:', finalCallbackUrl)
+    }
+
+    const state = Math.random().toString(36).substr(2)
+
+    // 构造微信授权URL（网站应用 - 扫码登录）
+    const authUrl =
+      `https://open.weixin.qq.com/connect/qrconnect?` +
+      `appid=${appid}&` +
+      `redirect_uri=${encodeURIComponent(finalCallbackUrl)}&` +
+      `response_type=code&` +
+      `scope=snsapi_login&` +
+      `state=${state}#wechat_redirect`
+
+    console.log('🔐 [WeChat] 授权 URL:', authUrl)
+    console.log('🔗 [WeChat] 回调地址:', finalCallbackUrl)
+
+    return NextResponse.json({
+      success: true,
+      authUrl,
+    })
+  } catch (error: any) {
+    console.error('❌ 构造微信授权URL失败:', error)
+    return NextResponse.json(
+      { error: '构造授权URL失败' },
+      { status: 500 }
+    )
+  }
+}
+=== /Users/8086k/project/components/app/api/auth/wechat/route.ts ===
+import { NextRequest, NextResponse } from 'next/server'
+import { wechatAuth } from '@/lib/wechat-auth'
+
+export async function GET(request: NextRequest) {
+  try {
+    const authUrl = wechatAuth.getAuthUrl()
+    return NextResponse.redirect(authUrl)
+  } catch (error) {
+    console.error('WeChat auth error:', error)
+    return NextResponse.json(
+      { error: 'WeChat OAuth not configured properly' },
+      { status: 500 }
+    )
+  }
+} === /Users/8086k/project/components/app/api/geo/detect/route.ts ===
+import { NextRequest, NextResponse } from 'next/server'
+import {
+  getRegionFromCountryCode,
+  getDefaultLanguage,
+  getPaymentMethodsByRegion,
+  getCurrencyByRegion,
+  isEuropeanCountry,
+  type Region,
+  type Language
+} from '@/lib/ip-detection'
+
+// 内存缓存，避免重复请求相同的IP
+const geoCache = new Map<string, { data: GeoLocation; timestamp: number }>()
+const CACHE_DURATION = 1000 * 60 * 30 // 30分钟缓存
+
+/**
+ * IP 地理位置检测 API (升级版)
+ *
+ * 功能：
+ * 1. 检测用户 IP 地址
+ * 2. 返回国家代码、货币、语言等信息
+ * 3. 区域分类：中国、美国、印度、新加坡、欧洲、其他
+ * 4. 欧洲地区标识（用于GDPR合规）
+ * 5. 自动语言识别（中文/英文）
+ *
+ * 使用 ip-api.com 免费服务 (无需注册，每分钟45次请求)
+ */
+
+export interface GeoLocation {
+  country: string        // 国家名称 (e.g., "China", "United States")
+  countryCode: string    // 国家代码 (e.g., "CN", "US")
+  region: string         // 地区代码 (e.g., "BJ", "CA")
+  regionName: string     // 地区名称 (e.g., "Beijing", "California")
+  city: string           // 城市 (e.g., "Beijing", "Los Angeles")
+  timezone: string       // 时区 (e.g., "Asia/Shanghai")
+  currency: string       // 推荐货币 (e.g., "CNY", "USD")
+  language: string       // 推荐语言 (e.g., "zh-CN", "en-US")
+  paymentMethods: string[] // 推荐支付方式
+  ip: string            // IP地址
+  regionCategory: Region // 区域分类 (新增)
+  languageCode: Language // 语言代码 (新增)
+  isEurope: boolean     // 是否欧洲 (新增)
+}
+
+// 从请求头获取真实 IP
+function getClientIP(request: NextRequest): string {
+  // 尝试从各种代理头获取真实 IP
+  const forwarded = request.headers.get('x-forwarded-for')
+  const realIP = request.headers.get('x-real-ip')
+  const cfConnectingIP = request.headers.get('cf-connecting-ip') // Cloudflare
+
+  if (cfConnectingIP) return cfConnectingIP
+  if (realIP) return realIP
+  if (forwarded) return forwarded.split(',')[0].trim()
+
+  // 开发环境：如果检测不到 IP，返回 null 让 API 处理错误
+  return ''
+}
+
+export async function GET(request: NextRequest) {
+  try {
+    const clientIP = getClientIP(request)
+
+    // 如果没有获取到 IP，直接返回默认配置
+    if (!clientIP) {
+      console.log('⚠️ [Geo] No IP detected, using default configuration')
+      const defaultLocation: GeoLocation = {
+        country: 'United States',
+        countryCode: 'US',
+        region: '',
+        regionName: '',
+        city: '',
+        timezone: 'America/New_York',
+        currency: 'USD',
+        language: 'en-US',
+        paymentMethods: ['stripe', 'paypal'],
+        ip: 'unknown',
+        regionCategory: 'usa',
+        languageCode: 'en',
+        isEurope: false
+      }
+      return NextResponse.json({
+        success: false,
+        error: 'No IP detected',
+        data: defaultLocation
+      })
+    }
+
+    // 检查缓存
+    const now = Date.now()
+    const cached = geoCache.get(clientIP)
+    if (cached && (now - cached.timestamp) < CACHE_DURATION) {
+      console.log(`✅ [Geo] 使用缓存数据 for IP: ${clientIP}`)
+      return NextResponse.json({
+        success: true,
+        data: cached.data,
+        cached: true
+      })
+    }
+
+    console.log(`🌍 [Geo] 请求新的地理位置数据 for IP: ${clientIP}`)
+
+    // 调用 ip-api.com 获取地理位置信息
+    const response = await fetch(`http://ip-api.com/json/${clientIP}?fields=status,message,country,countryCode,region,regionName,city,timezone,query`, {
+      headers: {
+        'Accept': 'application/json'
+      }
+    })
+
+    if (!response.ok) {
+      throw new Error('IP-API request failed')
+    }
+
+    const data = await response.json()
+
+    // 检查 API 响应状态
+    if (data.status !== 'success') {
+      throw new Error(data.message || 'IP detection failed')
+    }
+
+    // 获取国家代码和区域分类
+    const countryCode = data.countryCode || 'US'
+    const regionCategory = getRegionFromCountryCode(countryCode)
+    const languageCode = getDefaultLanguage(regionCategory)
+    const isEurope = isEuropeanCountry(countryCode)
+
+    // 获取区域配置
+    const currency = getCurrencyByRegion(regionCategory)
+    const paymentMethods = getPaymentMethodsByRegion(regionCategory)
+
+    // 构造返回数据
+    const geoLocation: GeoLocation = {
+      country: data.country,
+      countryCode: countryCode,
+      region: data.region,
+      regionName: data.regionName,
+      city: data.city,
+      timezone: data.timezone,
+      currency: currency,
+      language: languageCode === 'zh' ? 'zh-CN' : 'en-US',
+      paymentMethods: paymentMethods,
+      ip: data.query || clientIP,
+      regionCategory: regionCategory,
+      languageCode: languageCode,
+      isEurope: isEurope
+    }
+
+    // 存入缓存
+    geoCache.set(clientIP, { data: geoLocation, timestamp: now })
+
+    // 清理过期缓存
+    if (geoCache.size > 1000) { // 防止内存泄漏
+      const cutoff = now - CACHE_DURATION
+      for (const [ip, entry] of geoCache.entries()) {
+        if (entry.timestamp < cutoff) {
+          geoCache.delete(ip)
+        }
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: geoLocation,
+      cached: false
+    })
+
+  } catch (error) {
+    console.error('IP detection error:', error)
+
+    // 返回默认配置（假设为美国用户）
+    const defaultLocation: GeoLocation = {
+      country: 'United States',
+      countryCode: 'US',
+      region: '',
+      regionName: '',
+      city: '',
+      timezone: 'America/New_York',
+      currency: 'USD',
+      language: 'en-US',
+      paymentMethods: ['stripe', 'paypal'],
+      ip: 'unknown',
+      regionCategory: 'usa',
+      languageCode: 'en',
+      isEurope: false
+    }
+
+    return NextResponse.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'IP detection failed',
+      data: defaultLocation // 返回默认值确保应用可用
+    })
+  }
+}
+
+// 支持 POST 请求（用于指定 IP 测试）
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json()
+    const testIP = body.ip || getClientIP(request)
+
+    const response = await fetch(`http://ip-api.com/json/${testIP}?fields=status,message,country,countryCode,region,regionName,city,timezone,query`)
+    const data = await response.json()
+
+    if (data.status !== 'success') {
+      throw new Error(data.message || 'IP detection failed')
+    }
+
+    const countryCode = data.countryCode || 'US'
+    const regionCategory = getRegionFromCountryCode(countryCode)
+    const languageCode = getDefaultLanguage(regionCategory)
+    const isEurope = isEuropeanCountry(countryCode)
+
+    const currency = getCurrencyByRegion(regionCategory)
+    const paymentMethods = getPaymentMethodsByRegion(regionCategory)
+
+    const geoLocation: GeoLocation = {
+      country: data.country,
+      countryCode: countryCode,
+      region: data.region,
+      regionName: data.regionName,
+      city: data.city,
+      timezone: data.timezone,
+      currency: currency,
+      language: languageCode === 'zh' ? 'zh-CN' : 'en-US',
+      paymentMethods: paymentMethods,
+      ip: data.query || testIP,
+      regionCategory: regionCategory,
+      languageCode: languageCode,
+      isEurope: isEurope
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: geoLocation
+    })
+
+  } catch (error) {
+    return NextResponse.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'IP detection failed'
+    }, { status: 500 })
+  }
+}
+=== /Users/8086k/project/components/app/api/payment/alipay/create/route.ts ===
+import { NextRequest, NextResponse } from 'next/server'
+import { AlipaySdk } from 'alipay-sdk'
+import { createClient } from '@supabase/supabase-js'
+import { createDatabaseAdapter } from '@/lib/database/adapter'
+import { CloudBaseAdapter } from '@/lib/database/cloudbase-adapter'
+import { SupabaseAdapter } from '@/lib/database/supabase-adapter'
+
+// 支付宝支付配置 - 只支持公钥模式
+const alipayConfig = {
+  appId: process.env.ALIPAY_APP_ID,
+  privateKey: process.env.ALIPAY_PRIVATE_KEY,
+  alipayPublicKey: process.env.ALIPAY_PUBLIC_KEY,
+  gateway: process.env.ALIPAY_GATEWAY,
+  signType: 'RSA2',
+  charset: 'utf-8',
+  version: '1.0',
+  timeout: 30000,
+  camelcase: false, // 使用下划线命名
+}
+
+// 定价配置（与 Stripe/PayPal 保持一致）
+const pricingConfig = {
+  pro: {
+    monthly: 19.99, // 正式价格 $19.99/月
+    yearly: 168,   // 正式价格 $168/年
+  },
+  team: {
+    monthly: 299.99, // 正式价格 $299.99/月
+    yearly: 2520,  // 正式价格 $2520/年
+  },
+}
+
+// 汇率配置（美元转人民币，假设汇率 1 USD = 7.2 CNY）
+const USD_TO_CNY_RATE = 7.2
+
+// 地区检测
+const DEPLOYMENT_REGION = process.env.NEXT_PUBLIC_DEPLOYMENT_REGION || 'china'
+const IS_CHINA_DEPLOYMENT = DEPLOYMENT_REGION === 'china'
+
+// 生成唯一的支付ID（与mvp_modules-main保持一致）
+function generatePaymentId(): string {
+  return `pay_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    console.log('🔵 [Alipay] 开始创建支付订单...', { region: DEPLOYMENT_REGION })
+
+    // 检查支付宝配置
+    console.log('🔍 [Alipay] 检查环境变量配置:', {
+      ALIPAY_APP_ID: alipayConfig.appId ? '已配置' : '未配置',
+      ALIPAY_PRIVATE_KEY: alipayConfig.privateKey ? '已配置' : '未配置',
+      ALIPAY_PUBLIC_KEY: alipayConfig.alipayPublicKey ? '已配置' : '未配置',
+      ALIPAY_GATEWAY: alipayConfig.gateway ? '已配置' : '未配置',
+    })
+
+    if (!alipayConfig.appId || !alipayConfig.privateKey || !alipayConfig.alipayPublicKey) {
+      console.error('❌ [Alipay] 配置缺失:', {
+        hasAppId: !!alipayConfig.appId,
+        hasPrivateKey: !!alipayConfig.privateKey,
+        hasPublicKey: !!alipayConfig.alipayPublicKey,
+        ALIPAY_APP_ID: alipayConfig.appId || 'null/undefined',
+      })
+      return NextResponse.json(
+        {
+          error: 'Alipay payment is currently unavailable. Please use Stripe or PayPal.',
+          errorCode: 'ALIPAY_NOT_CONFIGURED',
+          details: 'Alipay credentials are not configured. Contact support.',
+        },
+        { status: 503 }
+      )
+    }
+
+    // 类型断言：此时配置已验证不为undefined
+    const validatedConfig = alipayConfig as {
+      appId: string;
+      privateKey: string;
+      alipayPublicKey: string;
+      gateway: string;
+      signType: string;
+      charset: string;
+      version: string;
+      timeout: number;
+      camelcase: boolean;
+    }
+
+    const body = await req.json()
+    const { planType, billingCycle, userEmail, userId: requestUserId } = body
+
+    console.log('📝 [Alipay] 订单信息:', { planType, billingCycle, userEmail, userId: requestUserId })
+
+    // 获取用户信息（用于数据库适配器）
+    const authHeader = req.headers.get('authorization')
+    let userId = requestUserId || ''
+
+    if (authHeader) {
+      // 如果有认证头，解析用户信息
+      try {
+        const token = authHeader.replace('Bearer ', '')
+        // 这里需要根据你的认证系统解析token获取用户ID和邮箱
+        // 暂时从请求体获取
+      } catch (error) {
+        console.warn('⚠️ [Alipay] 无法解析认证token')
+      }
+    }
+
+    if (!userId && IS_CHINA_DEPLOYMENT) {
+      console.error('❌ [Alipay] 国内版需要提供userId')
+      return NextResponse.json(
+        { error: 'User ID is required for domestic deployment' },
+        { status: 400 }
+      )
+    }
+
+    // 验证输入
+    if (!planType || !billingCycle || !userEmail) {
+      return NextResponse.json(
+        { error: 'Missing required fields: planType, billingCycle, userEmail' },
+        { status: 400 }
+      )
+    }
+
+    if (!['pro', 'team'].includes(planType)) {
+      return NextResponse.json({ error: 'Invalid plan type' }, { status: 400 })
+    }
+
+    if (!['monthly', 'yearly'].includes(billingCycle)) {
+      return NextResponse.json({ error: 'Invalid billing cycle' }, { status: 400 })
+    }
+
+    // 计算价格（美元）
+    const amountUSD = pricingConfig[planType as 'pro' | 'team'][billingCycle as 'monthly' | 'yearly']
+
+    // 转换为人民币
+    const amountCNY = (amountUSD * USD_TO_CNY_RATE).toFixed(2)
+
+    console.log('💰 [Alipay] 价格计算:', {
+      amountUSD: `$${amountUSD}`,
+      amountCNY: `¥${amountCNY}`,
+      rate: USD_TO_CNY_RATE,
+    })
+
+    // 生成订单号（与mvp_modules-main保持一致）
+    const outTradeNo = generatePaymentId()
+
+    // 订单描述（与mvp_modules-main保持一致）
+    const description = `${billingCycle === "monthly" ? "1 Month" : "1 Year"} Premium Membership (One-time Payment)`
+
+    // 初始化支付宝 SDK
+    const alipaySdk = new AlipaySdk(validatedConfig as any)
+
+    // 转换金额为数字（与mvp_modules-main保持一致）
+    const amountNum = parseFloat(amountCNY)
+
+    // 创建支付宝订单参数（与mvp_modules-main完全一致）
+    const bizContent = {
+      out_trade_no: outTradeNo, // 必需：商户订单号
+      total_amount: amountNum.toFixed(2), // 必需：订单总金额，单位元，精确到小数点后两位
+      subject: description, // 必需：订单标题，最长256字符（使用description而不是自定义字符串）
+      product_code: 'FAST_INSTANT_TRADE_PAY', // 电脑网站支付
+      passback_params: userId || "", // ✅ 传递用户ID，支付宝会原样返回
+      // ✅ 重要：notify_url 和 return_url 必须在 bizContent 中，支付宝才会异步回调
+      notify_url: `${process.env.NEXT_PUBLIC_SITE_URL}/api/payment/alipay/notify`,
+      return_url: `${process.env.NEXT_PUBLIC_SITE_URL}/payment/success?session_id=${outTradeNo}`,
+    }
+
+    console.log('📤 [Alipay] 支付宝请求参数:', { bizContent })
+
+    // 生成支付链接（与mvp_modules-main完全一致）
+    const method = 'alipay.trade.page.pay'
+    const orderData = {
+      method,
+      bizContent,
+    }
+
+    const paymentUrl = await (alipaySdk as any).pageExec(orderData.method, {
+      return_url: orderData.bizContent.return_url,
+      notify_url: orderData.bizContent.notify_url,
+      bizContent: orderData.bizContent,
+    })
+
+    console.log('✅ [Alipay] 支付链接生成成功')
+
+    // 保存订单到数据库（使用数据库适配器）
+    const amountInCents = Math.round(parseFloat(amountCNY) * 100) // 转换为分
+    const paymentFee = Math.round(amountInCents * 0.006) // 支付宝手续费约 0.6%
+    const netAmount = amountInCents - paymentFee
+
+    try {
+      console.log('🔧 [Alipay] 准备保存订单到数据库...', { userId, IS_CHINA_DEPLOYMENT })
+
+      // 创建数据库适配器
+      const dbAdapter = IS_CHINA_DEPLOYMENT ?
+        new CloudBaseAdapter(userId) :
+        new SupabaseAdapter(userId)
+
+      console.log('🔧 [Alipay] 数据库适配器创建成功')
+
+      // 适配不同数据库的字段结构
+      const transactionData = IS_CHINA_DEPLOYMENT ? {
+        // CloudBase字段结构
+        user_id: userId,
+        product_name: 'sitehub',
+        plan_type: planType,
+        billing_cycle: billingCycle,
+        payment_method: 'alipay',
+        payment_status: 'pending',
+        transaction_type: 'purchase',
+        currency: 'CNY',
+        gross_amount: amountInCents,
+        payment_fee: paymentFee,
+        net_amount: netAmount,
+        profit: netAmount,
+        transaction_id: outTradeNo,
+        payment_time: new Date().toISOString()
+      } : {
+        // Supabase字段结构
+        user_email: userEmail,
+        plan_type: planType,
+        billing_cycle: billingCycle,
+        amount_usd: amountUSD,
+        amount_cny: parseFloat(amountCNY),
+        payment_method: 'alipay',
+        transaction_id: outTradeNo,
+        status: 'pending'
+      }
+
+      console.log('🔧 [Alipay] 准备保存数据:', transactionData)
+
+      const saveSuccess = await dbAdapter.savePaymentTransaction(transactionData)
+
+      if (!saveSuccess) {
+        console.error('⚠️ [Alipay] 数据库保存失败 (不影响支付)')
+      } else {
+        console.log('✅ [Alipay] 订单已保存到数据库')
+      }
+    } catch (dbError) {
+      console.error('⚠️ [Alipay] 数据库操作异常 (不影响支付):', dbError)
+      console.error('⚠️ [Alipay] 错误详情:', {
+        message: dbError instanceof Error ? dbError.message : String(dbError),
+        stack: dbError instanceof Error ? dbError.stack : undefined,
+        userId,
+        IS_CHINA_DEPLOYMENT
+      })
+    }
+
+    // 返回支付链接
+    return NextResponse.json({
+      paymentUrl,
+      orderId: outTradeNo,
+      amount: amountCNY,
+      currency: 'CNY',
+    })
+  } catch (error) {
+    console.error('❌ [Alipay] 订单创建失败:', error)
+    return NextResponse.json(
+      {
+        error: 'Failed to create Alipay order',
+        details: error instanceof Error ? error.message : 'Unknown error',
+      },
+      { status: 500 }
+    )
+  }
+}
+=== /Users/8086k/project/components/app/api/payment/alipay/notify/route.ts ===
+import { NextRequest, NextResponse } from 'next/server'
+import { AlipaySdk } from 'alipay-sdk'
+import { createClient } from '@supabase/supabase-js'
+import { CloudBaseAdapter } from '@/lib/database/cloudbase-adapter'
+import { SupabaseAdapter } from '@/lib/database/supabase-adapter'
+
+// 支付宝配置（完全使用 .env.local 中的值）
+const alipayConfig = {
+  appId: process.env.ALIPAY_APP_ID,
+  privateKey: process.env.ALIPAY_PRIVATE_KEY,
+  alipayPublicKey: process.env.ALIPAY_PUBLIC_KEY,
+  gateway: process.env.ALIPAY_GATEWAY,
+  signType: 'RSA2',
+  charset: 'utf-8',
+  version: '1.0',
+}
+
+// 地区检测
+const DEPLOYMENT_REGION = process.env.NEXT_PUBLIC_DEPLOYMENT_REGION || 'china'
+const IS_CHINA_DEPLOYMENT = DEPLOYMENT_REGION === 'china'
+
+/**
+ * POST - 支付宝异步通知回调
+ * 支付宝会在支付成功后调用此接口
+ */
+export async function POST(req: NextRequest) {
+  try {
+    console.log('🔔 [Alipay Notify] 收到支付宝回调通知', { region: DEPLOYMENT_REGION })
+
+    // 检查配置
+    if (!alipayConfig.appId || !alipayConfig.privateKey || !alipayConfig.alipayPublicKey) {
+      console.error('❌ [Alipay Notify] 配置缺失')
+      return new NextResponse('fail', { status: 503 })
+    }
+
+    // 获取POST数据
+    const formData = await req.formData()
+    const params: Record<string, string> = {}
+
+    formData.forEach((value, key) => {
+      params[key] = value.toString()
+    })
+
+    console.log('📝 [Alipay Notify] 回调参数:', {
+      out_trade_no: params.out_trade_no,
+      trade_no: params.trade_no,
+      trade_status: params.trade_status,
+      total_amount: params.total_amount,
+    })
+
+    // 初始化支付宝 SDK
+    const alipaySdk = new AlipaySdk(alipayConfig)
+
+    // 验证签名
+    const signVerified = alipaySdk.checkNotifySign(params)
+
+    if (!signVerified) {
+      console.error('❌ [Alipay Notify] 签名验证失败')
+      return new NextResponse('fail', { status: 400 })
+    }
+
+    console.log('✅ [Alipay Notify] 签名验证通过')
+
+    // 提取关键信息
+    const {
+      out_trade_no, // 商户订单号
+      trade_no, // 支付宝交易号
+      trade_status, // 交易状态
+      total_amount, // 订单金额
+      passback_params, // ✅ 从 passback_params 获取用户邮箱（创建订单时传递）
+    } = params
+    
+    // 从 passback_params 提取 userEmail（如果存在）
+    const userEmail = passback_params || ''
+
+    // 更新数据库订单状态
+    if (trade_status === 'TRADE_SUCCESS' || trade_status === 'TRADE_FINISHED') {
+      console.log('💰 [Alipay Notify] 支付成功，更新订单状态')
+
+      let transaction: any = null
+      let finalUserEmail = userEmail
+      let userId = ''
+
+      try {
+        if (IS_CHINA_DEPLOYMENT) {
+          // CloudBase逻辑：需要先查询订单获取用户信息
+          const cloudbaseAdapter = new CloudBaseAdapter('')
+          transaction = await cloudbaseAdapter.getPaymentTransaction(out_trade_no)
+
+          if (!transaction) {
+            console.error('❌ [Alipay Notify] CloudBase未找到订单记录:', out_trade_no)
+            return new NextResponse('success', {
+              status: 200,
+              headers: { 'Content-Type': 'text/plain' },
+            })
+          }
+
+          userId = transaction.user_id
+          // CloudBase中可能没有直接的邮箱，需要从用户信息中获取
+          finalUserEmail = transaction.user_email || userEmail
+        } else {
+          // Supabase逻辑
+          const supabaseAdapter = new SupabaseAdapter('')
+          transaction = await supabaseAdapter.getPaymentTransaction(out_trade_no)
+
+          if (!transaction) {
+            console.error('❌ [Alipay Notify] Supabase未找到订单记录:', out_trade_no)
+            return new NextResponse('success', {
+              status: 200,
+              headers: { 'Content-Type': 'text/plain' },
+            })
+          }
+
+          finalUserEmail = transaction.user_email || userEmail
+          userId = transaction.user_id
+        }
+
+        console.log('📦 [Alipay Notify] 订单信息:', {
+          email: finalUserEmail,
+          plan: transaction.plan_type,
+          cycle: transaction.billing_cycle,
+          db: IS_CHINA_DEPLOYMENT ? 'CloudBase' : 'Supabase'
+        })
+
+        if (!finalUserEmail) {
+          console.error('❌ [Alipay Notify] 无法获取用户邮箱')
+          return new NextResponse('success', {
+            status: 200,
+            headers: { 'Content-Type': 'text/plain' },
+          })
+        }
+
+        // 更新订单状态
+        if (IS_CHINA_DEPLOYMENT) {
+          const cloudbaseAdapter = new CloudBaseAdapter(userId)
+          const updateSuccess = await cloudbaseAdapter.updatePaymentStatus(out_trade_no, 'completed')
+          if (!updateSuccess) {
+            console.error('❌ [Alipay Notify] CloudBase更新失败')
+          } else {
+            console.log('✅ [Alipay Notify] CloudBase订单状态已更新为 completed')
+          }
+        } else {
+          const supabaseAdapter = new SupabaseAdapter(userId)
+          const updateSuccess = await supabaseAdapter.updatePaymentStatus(out_trade_no, 'completed')
+          if (!updateSuccess) {
+            console.error('❌ [Alipay Notify] Supabase更新失败')
+          } else {
+            console.log('✅ [Alipay Notify] Supabase订单状态已更新为 completed')
+          }
+        }
+
+        // 计算订阅到期时间
+        const now = new Date()
+        const expireTime = new Date(now)
+        if (transaction.billing_cycle === 'monthly') {
+          expireTime.setMonth(expireTime.getMonth() + 1)
+        } else {
+          expireTime.setFullYear(expireTime.getFullYear() + 1)
+        }
+
+        console.log('📅 Alipay subscription period:', {
+          planType: transaction.plan_type,
+          billingCycle: transaction.billing_cycle,
+          startTime: now.toISOString(),
+          expireTime: expireTime.toISOString(),
+          db: IS_CHINA_DEPLOYMENT ? 'CloudBase' : 'Supabase'
+        })
+
+        // 更新或创建用户订阅
+        const subscriptionData = {
+          user_email: finalUserEmail,
+          platform: 'web',
+          payment_method: 'alipay',
+          plan_type: transaction.plan_type,
+          billing_cycle: transaction.billing_cycle,
+          status: 'active',
+          start_time: now.toISOString(),
+          expire_time: expireTime.toISOString(),
+          alipay_trade_no: trade_no,
+          auto_renew: false,
+          next_billing_date: expireTime.toISOString(),
+          updated_at: now.toISOString(),
+        }
+
+        if (IS_CHINA_DEPLOYMENT) {
+          const cloudbaseAdapter = new CloudBaseAdapter(userId)
+          const subSuccess = await cloudbaseAdapter.upsertSubscription(subscriptionData)
+          if (!subSuccess) {
+            console.error('❌ [Alipay Notify] CloudBase订阅更新失败')
+          } else {
+            console.log('✅ [Alipay Notify] CloudBase用户订阅已激活')
+          }
+        } else {
+          const supabaseAdapter = new SupabaseAdapter(userId)
+          const subSuccess = await supabaseAdapter.upsertSubscription(subscriptionData)
+          if (!subSuccess) {
+            console.error('❌ [Alipay Notify] Supabase订阅更新失败')
+          } else {
+            console.log('✅ [Alipay Notify] Supabase用户订阅已激活')
+          }
+
+          // 更新用户的 pro 状态（仅Supabase需要）
+          try {
+            const supabaseClient = createClient(
+              process.env.NEXT_PUBLIC_SUPABASE_URL!,
+              process.env.SUPABASE_SERVICE_ROLE_KEY!
+            )
+            const { data: userData, error: userError } = await supabaseClient.auth.admin.listUsers()
+            const user = userData?.users.find(u => u.email === finalUserEmail)
+
+            if (user) {
+              const { error: updateError } = await supabaseClient.auth.admin.updateUserById(
+                user.id,
+                {
+                  user_metadata: {
+                    ...user.user_metadata,
+                    pro: true,
+                    upgraded_at: now.toISOString()
+                  }
+                }
+              )
+
+              if (updateError) {
+                console.error('Failed to update user pro status:', updateError)
+              } else {
+                console.log('✅ User pro status updated:', finalUserEmail)
+              }
+            } else {
+              console.warn('⚠️ User not found in auth.users:', finalUserEmail)
+            }
+          } catch (error) {
+            console.error('Error updating user pro status:', error)
+            // 不返回错误，因为订阅已经创建成功
+          }
+        }
+      } catch (error) {
+        console.error('❌ [Alipay Notify] 处理支付成功逻辑时出错:', error)
+        // 即使处理出错，也返回success给支付宝，避免重复通知
+      }
+    } else if (trade_status === 'TRADE_CLOSED') {
+      console.log('⚠️ [Alipay Notify] 交易已关闭')
+
+      // 更新订单状态为已关闭
+      if (IS_CHINA_DEPLOYMENT) {
+        // CloudBase逻辑：先查询获取userId
+        const cloudbaseAdapter = new CloudBaseAdapter('')
+        const transaction = await cloudbaseAdapter.getPaymentTransaction(out_trade_no)
+        if (transaction) {
+          const adapterWithUser = new CloudBaseAdapter(transaction.user_id)
+          await adapterWithUser.updatePaymentStatus(out_trade_no, 'cancelled')
+          console.log('✅ [Alipay Notify] CloudBase订单状态已更新为 cancelled')
+        }
+      } else {
+        // Supabase逻辑
+        const supabaseAdapter = new SupabaseAdapter('')
+        await supabaseAdapter.updatePaymentStatus(out_trade_no, 'cancelled')
+        console.log('✅ [Alipay Notify] Supabase订单状态已更新为 cancelled')
+      }
+    }
+
+    // 返回 success 给支付宝（必须返回纯文本 "success"）
+    console.log('✅ [Alipay Notify] 回调处理完成，返回 success')
+    return new NextResponse('success', {
+      status: 200,
+      headers: {
+        'Content-Type': 'text/plain',
+      },
+    })
+  } catch (error) {
+    console.error('❌ [Alipay Notify] 回调处理异常:', error)
+    // 返回 fail 给支付宝，支付宝会重试
+    return new NextResponse('fail', {
+      status: 500,
+      headers: {
+        'Content-Type': 'text/plain',
+      },
+    })
+  }
+}
+
+/**
+ * GET - 支付宝同步返回（用户支付完成后浏览器跳转）
+ * 这个接口主要用于页面跳转，不处理业务逻辑（业务逻辑在POST中处理）
+ */
+export async function GET(req: NextRequest) {
+  try {
+    console.log('🔄 [Alipay Return] 用户支付完成，同步返回')
+
+    const searchParams = req.nextUrl.searchParams
+    const params: Record<string, string> = {}
+
+    searchParams.forEach((value, key) => {
+      params[key] = value
+    })
+
+    console.log('📝 [Alipay Return] 返回参数:', {
+      out_trade_no: params.out_trade_no,
+      trade_no: params.trade_no,
+      total_amount: params.total_amount,
+    })
+
+    // 验证签名
+    if (alipayConfig.alipayPublicKey) {
+      const alipaySdk = new AlipaySdk(alipayConfig)
+      const signVerified = alipaySdk.checkNotifySign(params)
+
+      if (!signVerified) {
+        console.error('❌ [Alipay Return] 签名验证失败')
+  return NextResponse.redirect(`${process.env.NEXT_PUBLIC_SITE_URL}/payment/cancel`)
+      }
+
+      console.log('✅ [Alipay Return] 签名验证通过')
+    }
+
+    // 跳转到成功页面（带订单号）
+    const successUrl = new URL('/payment/success', process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000')
+    if (params.out_trade_no) {
+      successUrl.searchParams.set('session_id', params.out_trade_no)
+    }
+
+    return NextResponse.redirect(successUrl.toString())
+  } catch (error) {
+    console.error('❌ [Alipay Return] 同步返回处理异常:', error)
+    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_SITE_URL}/payment/cancel`)
+  }
+}
+=== /Users/8086k/project/components/app/api/payment/alipay/verify/route.ts ===
+import { NextRequest, NextResponse } from 'next/server'
+import { AlipaySdk } from 'alipay-sdk'
+import { createClient } from '@supabase/supabase-js'
+
+// 支付宝配置
+const alipayConfig = {
+  appId: process.env.ALIPAY_APP_ID,
+  privateKey: process.env.ALIPAY_PRIVATE_KEY,
+  alipayPublicKey: process.env.ALIPAY_PUBLIC_KEY,
+  gateway: process.env.ALIPAY_GATEWAY,
+  signType: 'RSA2',
+  charset: 'utf-8',
+  version: '1.0',
+}
+
+export async function GET(req: NextRequest) {
+  try {
+    const searchParams = req.nextUrl.searchParams
+    const outTradeNo = searchParams.get('out_trade_no')
+
+    if (!outTradeNo) {
+      return NextResponse.json(
+        { success: false, error: 'Missing out_trade_no parameter' },
+        { status: 400 }
+      )
+    }
+
+    console.log('🔍 [Alipay Verify] Verifying payment:', outTradeNo)
+
+    // 检查配置
+    if (!alipayConfig.appId || !alipayConfig.privateKey || !alipayConfig.alipayPublicKey) {
+      console.error('❌ [Alipay Verify] 配置缺失')
+      return NextResponse.json(
+        { success: false, error: 'Alipay configuration missing' },
+        { status: 500 }
+      )
+    }
+
+    // 初始化支付宝SDK
+    const alipaySdk = new AlipaySdk(alipayConfig as any)
+
+    // 查询支付宝支付状态
+    const result = await alipaySdk.exec('alipay.trade.query', {
+      bizContent: {
+        out_trade_no: outTradeNo,
+      },
+    })
+
+    console.log('📊 [Alipay Verify] Query result:', result)
+
+    if (result.code === '10000') {
+      // 支付成功
+      const tradeStatus = result.tradeStatus
+      console.log('✅ [Alipay Verify] Payment verified:', {
+        out_trade_no: outTradeNo,
+        trade_status: tradeStatus,
+        trade_no: result.tradeNo,
+        total_amount: result.totalAmount,
+      })
+
+      return NextResponse.json({
+        success: true,
+        trade_status: tradeStatus,
+        trade_no: result.tradeNo,
+        total_amount: result.totalAmount,
+        out_trade_no: outTradeNo,
+      })
+    } else {
+      // 查询失败或支付未完成
+      console.log('❌ [Alipay Verify] Payment not completed:', {
+        code: result.code,
+        msg: result.msg,
+        sub_code: result.subCode,
+        sub_msg: result.subMsg,
+      })
+
+      return NextResponse.json({
+        success: false,
+        error: result.msg || 'Payment not completed',
+        code: result.code,
+        trade_status: result.tradeStatus,
+      })
+    }
+  } catch (error) {
+    console.error('❌ [Alipay Verify] Verification error:', error)
+    return NextResponse.json(
+      {
+        success: false,
+        error: error instanceof Error ? error.message : 'Verification failed'
+      },
+      { status: 500 }
+    )
+  }
+}
+
+
+=== /Users/8086k/project/components/app/api/payment/paypal/capture/route.ts ===
+import { NextRequest, NextResponse } from 'next/server'
+import { Client, Environment, OrdersController } from '@paypal/paypal-server-sdk'
+import { createClient } from '@supabase/supabase-js'
+
+export async function POST(req: NextRequest) {
+  try {
+// 初始化PayPal客户端
+const client = new Client({
+  clientCredentialsAuthCredentials: {
+    oAuthClientId: process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID!,
+    oAuthClientSecret: process.env.PAYPAL_CLIENT_SECRET!,
+  },
+  environment: process.env.PAYPAL_MODE === 'production'
+    ? Environment.Production
+    : Environment.Sandbox,
+})
+
+const ordersController = new OrdersController(client)
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
+
+    const { orderId, planType, userEmail, billingCycle } = await req.json()
+
+    console.log('🟡 PayPal capture request:', { orderId, planType, userEmail, billingCycle })
+
+    if (!orderId || !planType || !userEmail) {
+      return NextResponse.json(
+        { error: 'Missing required fields: orderId, planType, userEmail' },
+        { status: 400 }
+      )
+    }
+
+    // 捕获PayPal支付
+    const request = {
+      id: orderId,
+      body: {},
+    }
+
+    console.log('📤 Calling PayPal captureOrder API...')
+    const { body: order } = await ordersController.captureOrder(request)
+    console.log('📥 PayPal capture response:', { id: order.id, status: order.status })
+
+    // 验证支付状态
+    if (order.status !== 'COMPLETED') {
+      console.error('❌ PayPal order status not COMPLETED:', order.status)
+      return NextResponse.json(
+        { error: 'Payment not completed', status: order.status },
+        { status: 400 }
+      )
+    }
+
+    // 计算订阅到期时间（优先使用 billingCycle，兼容旧数据）
+    const now = new Date()
+    const expireTime = new Date(now)
+    const cycle = billingCycle || planType // 兼容旧数据
+
+    if (cycle === 'yearly' || planType === 'yearly') {
+      expireTime.setFullYear(expireTime.getFullYear() + 1)
+    } else {
+      expireTime.setMonth(expireTime.getMonth() + 1)
+    }
+
+    console.log('📅 Subscription period:', {
+      startTime: now.toISOString(),
+      expireTime: expireTime.toISOString(),
+      billingCycle: cycle
+    })
+
+    // 获取支付金额
+    const paymentAmount = order.purchaseUnits?.[0]?.payments?.captures?.[0]?.amount?.value || '0'
+    const amountInCents = Math.round(parseFloat(paymentAmount) * 100)
+
+    // 更新Supabase订阅状态（使用 web_subscriptions）
+    const { data: subscriptionRows, error: subError } = await supabase.from('web_subscriptions').upsert({
+      user_email: userEmail,
+      platform: 'web',
+      payment_method: 'paypal',
+      plan_type: planType,
+      billing_cycle: billingCycle || 'monthly', // 保存计费周期
+      status: 'active',
+      start_time: now.toISOString(),
+      expire_time: expireTime.toISOString(),
+      auto_renew: false,
+      next_billing_date: expireTime.toISOString(),
+      paypal_order_id: orderId,
+      updated_at: now.toISOString(),
+    }, {
+      onConflict: 'user_email'
+    }).select().maybeSingle()
+
+    if (subError) {
+      console.error('Failed to update subscription:', subError)
+      return NextResponse.json({ error: 'Database error' }, { status: 500 })
+    }
+
+
+================================================================================
+第 663-692 页 (后 30 页)
+================================================================================
+  "SoundCloud": "SoundCloud",
+  "Bandcamp": "Bandcamp",
+  "Last.fm": "Last.fm",
+  "Deezer": "Deezer",
+  "Apple Music": "Apple Music",
+  "Pandora": "Pandora",
+  "Snapchat": "Snapchat",
+  "Clubhouse": "Clubhouse",
+  "Mastodon": "Mastodon",
+  "Signal": "Signal",
+  "Viber": "Viber",
+  "WeChat Work": "企业微信",
+  "DingTalk": "钉钉",
+  "Feishu": "飞书",
+  "Tencent Meeting": "腾讯会议",
+  "VooV Meeting": "腾讯会议国际版",
+  "Coinbase": "Coinbase",
+  "Binance": "币安",
+  "Kraken": "Kraken",
+  "Robinhood": "Robinhood",
+  "E*TRADE": "E*TRADE",
+  "Charles Schwab": "嘉信理财",
+  "Fidelity": "富达",
+  "Wise": "Wise",
+  "Revolut": "Revolut",
+  "N26": "N26",
+  "Etsy": "Etsy",
+  "AliExpress": "速卖通",
+  "Wish": "Wish",
+  "Overstock": "Overstock",
+  "Wayfair": "Wayfair",
+  "Target": "Target",
+  "Walmart": "沃尔玛",
+  "Costco": "好市多",
+  "Best Buy": "百思买",
+  "Newegg": "新蛋",
+  "BBC": "BBC",
+  "CNN": "CNN",
+  "Reuters": "路透社",
+  "AP News": "美联社",
+  "New York Times": "纽约时报",
+  "Wall Street Journal": "华尔街日报",
+  "The Guardian": "卫报",
+  "The Economist": "经济学人",
+  "Forbes": "福布斯",
+  "TechCrunch": "TechCrunch",
+  "The Verge": "The Verge",
+  "Wired": "连线",
+  "Ars Technica": "Ars Technica",
+  "Engadget": "Engadget",
+  "Mashable": "Mashable",
+  "BuzzFeed": "BuzzFeed",
+  "VICE": "VICE",
+  "1Password": "1Password",
+  "LastPass": "LastPass",
+  "Bitwarden": "Bitwarden",
+  "NordVPN": "NordVPN",
+  "ExpressVPN": "ExpressVPN",
+  "Surfshark": "Surfshark",
+  "Grammarly": "Grammarly",
+  "DeepL": "DeepL",
+  "Google Translate": "Google 翻译",
+  "Wolfram Alpha": "Wolfram Alpha",
+  "Calculator.net": "Calculator.net",
+  "Convertio": "Convertio",
+  "SmallPDF": "SmallPDF",
+  "WeTransfer": "WeTransfer",
+  "MEGA": "MEGA",
+  "Box": "Box",
+  "Zhihu Live": "知乎Live",
+  "Douyin Live": "抖音直播",
+  "Kuaishou Live": "快手直播",
+  "Huya": "虎牙直播",
+  "Douyu": "斗鱼直播",
+  "YY": "YY语音",
+  "Miaopai": "秒拍",
+  "JD Global": "京东全球",
+  "Tumblr": "Tumblr",
+  "Zalando": "Zalando",
+  "ASOS": "ASOS",
+  "H&M": "H&M",
+  "Zara": "Zara",
+  "Disney+": "Disney+",
+  "Hulu": "Hulu",
+  "Prime Video": "Prime Video",
+  "HBO Max": "HBO Max",
+  "Paramount+": "Paramount+",
+  "Peacock": "Peacock",
+  "Apple TV+": "Apple TV+",
+  "Crunchyroll": "Crunchyroll",
+  "Tidal": "Tidal",
+  "Amazon Music": "Amazon Music",
+  "YouTube Music": "YouTube Music",
+  "Terraform": "Terraform",
+  "Ansible": "Ansible",
+  "Adobe Creative": "Adobe创意",
+  "Adobe XD": "Adobe XD",
+  "Principle": "Principle",
+  "ProtoPie": "ProtoPie",
+  "Monday.com": "Monday.com",
+  "ClickUp": "ClickUp",
+  "Basecamp": "Basecamp",
+  "edX": "edX",
+  "Skillshare": "Skillshare",
+  "MasterClass": "MasterClass",
+  "LinkedIn Learning": "LinkedIn学习",
+  "Pluralsight": "Pluralsight",
+  "Steam": "Steam",
+  "Epic Games": "Epic Games",
+  "Ubisoft": "育碧",
+  "EA Games": "EA游戏",
+  "Activision": "动视",
+  "Roblox": "Roblox",
+  "Booking.com": "Booking.com",
+  "Kayak": "Kayak",
+  "Skyscanner": "Skyscanner",
+  "TripAdvisor": "猫途鹰",
+  "Uber": "Uber",
+  "Lyft": "Lyft",
+  "MyFitnessPal": "MyFitnessPal",
+  "Strava": "Strava",
+  "Fitbit": "Fitbit",
+  "Apple Health": "Apple健康",
+  "Calm": "Calm",
+  "Headspace": "Headspace",
+  "Peloton": "Peloton",
+  "Nike Training": "Nike训练"
+}
+=== /Users/8086k/project/components/lib/supabase.ts ===
+import { createClient } from './supabase/client'
+
+export const supabase = createClient()
+
+// Auth helper functions
+export const auth = {
+  // Sign up with email and password
+  signUp: async (email: string, password: string) => {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+    })
+    return { data, error }
+  },
+
+  // Sign in with email and password
+  signIn: async (email: string, password: string) => {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    })
+    return { data, error }
+  },
+
+  // Sign in with Google
+  signInWithGoogle: async () => {
+    // 使用 window.location.origin 作为回调地址（客户端运行时获取）
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`
+      }
+    })
+    return { data, error }
+  },
+
+  // Sign in with Facebook
+  signInWithFacebook: async () => {
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'facebook',
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`
+      }
+    })
+    return { data, error }
+  },
+
+  // Sign in with WeChat (using custom OAuth)
+  signInWithWeChat: async () => {
+    // WeChat OAuth requires custom implementation since it's not a built-in Supabase provider
+    // This would need to be implemented using WeChat's official SDK or a custom OAuth flow
+    const error = new Error('WeChat authentication requires custom implementation')
+    return { data: null, error }
+  },
+
+  // Sign in with phone number (OTP)
+  signInWithPhone: async (phone: string) => {
+    const { data, error } = await supabase.auth.signInWithOtp({
+      phone: phone
+    })
+    return { data, error }
+  },
+
+  // Verify phone OTP code
+  verifyPhoneOTP: async (phone: string, token: string) => {
+    const { data, error } = await supabase.auth.verifyOtp({
+      phone: phone,
+      token: token,
+      type: 'sms'
+    })
+    return { data, error }
+  },
+
+  // Sign out
+  signOut: async () => {
+    const { error } = await supabase.auth.signOut()
+    return { error }
+  },
+
+  // Get current user
+  getCurrentUser: async () => {
+    const { data: { user }, error } = await supabase.auth.getUser()
+    return { user, error }
+  },
+
+  // Get current session
+  getCurrentSession: async () => {
+    const { data: { session }, error } = await supabase.auth.getSession()
+    return { session, error }
+  },
+
+  // Reset password with email
+  resetPassword: async (email: string) => {
+    const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/auth/reset-password`
+    })
+    return { data, error }
+  },
+
+  // Update password
+  updatePassword: async (newPassword: string) => {
+    const { data, error } = await supabase.auth.updateUser({
+      password: newPassword
+    })
+    return { data, error }
+  },
+
+  // Listen to auth changes
+  onAuthStateChange: (callback: (event: string, session: any) => void) => {
+    return supabase.auth.onAuthStateChange(callback)
+  }
+} === /Users/8086k/project/components/lib/supabase/client.ts ===
+import { createClient as createSupabaseClient } from '@supabase/supabase-js'
+
+export function createClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    console.warn('Missing Supabase environment variables, using mock client')
+    // 返回一个模拟的Supabase客户端，避免错误
+    return {
+      auth: {
+        getSession: async () => ({ data: { session: null }, error: null }),
+        signInWithOAuth: async () => ({ data: null, error: { message: 'Supabase not configured' } }),
+        signInWithPassword: async () => ({ data: { user: null, session: null }, error: { message: 'Supabase not configured' } }),
+        signUp: async () => ({ data: { user: null, session: null }, error: { message: 'Supabase not configured' } }),
+        signOut: async () => ({ error: null }),
+        onAuthStateChange: (callback: any) => {
+          // 立即调用callback以完成初始化
+          setTimeout(() => callback('INITIAL_SESSION', null), 0)
+          return { data: { subscription: { unsubscribe: () => {} } } }
+        }
+      },
+      from: () => ({
+        select: () => ({ eq: () => ({ data: [], error: null }) }),
+        insert: () => ({ data: null, error: null }),
+        update: () => ({ eq: () => ({ data: null, error: null }) }),
+        delete: () => ({ eq: () => ({ data: null, error: null }) })
+      })
+    } as any
+  }
+
+  // 检查是否是占位符配置
+  if (supabaseUrl.includes('placeholder') || supabaseAnonKey === 'placeholder_key') {
+    console.warn('Using placeholder Supabase configuration, features will be limited')
+    // 返回模拟客户端
+    return {
+      auth: {
+        getSession: async () => ({ data: { session: null }, error: null }),
+        signInWithOAuth: async () => ({ data: null, error: { message: 'Supabase not configured' } }),
+        signInWithPassword: async () => ({ data: { user: null, session: null }, error: { message: 'Supabase not configured' } }),
+        signUp: async () => ({ data: { user: null, session: null }, error: { message: 'Supabase not configured' } }),
+        signOut: async () => ({ error: null }),
+        onAuthStateChange: (callback: any) => {
+          // 立即调用callback以完成初始化
+          setTimeout(() => callback('INITIAL_SESSION', null), 0)
+          return { data: { subscription: { unsubscribe: () => {} } } }
+        }
+      },
+      from: () => ({
+        select: () => ({ eq: () => ({ data: [], error: null }) }),
+        insert: () => ({ data: null, error: null }),
+        update: () => ({ eq: () => ({ data: null, error: null }) }),
+        delete: () => ({ eq: () => ({ data: null, error: null }) })
+      })
+    } as any
+  }
+
+  return createSupabaseClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      autoRefreshToken: true,
+      persistSession: true,
+      detectSessionInUrl: true,
+      storageKey: 'sitehub-auth-token',
+      storage: typeof window !== 'undefined' ? window.localStorage : undefined,
+      flowType: 'pkce'
+    }
+  })
+}
+=== /Users/8086k/project/components/lib/utils.ts ===
+import { clsx, type ClassValue } from "clsx"
+import { twMerge } from "tailwind-merge"
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs))
+}
+=== /Users/8086k/project/components/lib/webview-utils.ts ===
+/**
+ * WebView环境检测和链接处理工具
+ * 用于优化在原生应用WebView中的用户体验
+ */
+
+/**
+ * 检测当前是否在WebView环境中运行
+ */
+export function isWebView(): boolean {
+  if (typeof window === 'undefined') {
+    return false
+  }
+
+  const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera
+
+  // 检测常见的WebView标识
+  const webViewIndicators = [
+    // Android WebView
+    /wv/i,
+    /WebView/i,
+    // iOS WebView
+    /(iPhone|iPod|iPad)(?!.*Safari\/)/i,
+    // React Native
+    /ReactNativeWebView/i,
+    // Electron
+    /Electron/i,
+    // 微信内置浏览器
+    /MicroMessenger/i,
+    // QQ内置浏览器
+    /QQ\//i,
+    // 微博内置浏览器
+    /Weibo/i,
+  ]
+
+  // 检查是否匹配任何WebView标识
+  const isWebViewUA = webViewIndicators.some(regex => regex.test(userAgent))
+
+  // 检查是否存在WebView相关的全局对象
+  const hasWebViewObject = !!(
+    (window as any).ReactNativeWebView ||
+    (window as any).webkit?.messageHandlers ||
+    (window as any).Android
+  )
+
+  // 检测是否为独立应用（PWA或WebView）
+  const isStandalone =
+    (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
+    (navigator as any).standalone ||
+    document.referrer.includes('android-app://')
+
+  return isWebViewUA || hasWebViewObject || isStandalone
+}
+
+/**
+ * 检测WebView的具体类型
+ */
+export function getWebViewType(): 'android' | 'ios' | 'electron' | 'wechat' | 'tauri' | 'capacitor' | 'median' | 'nativeify' | 'browser' | 'unknown' {
+  if (typeof window === 'undefined') {
+    return 'unknown'
+  }
+
+  const userAgent = navigator.userAgent || ''
+
+  // 检测 median.co (iOS/Android)
+  // median.co 会注入特定的全局对象或 User-Agent 标识
+  if ((window as any).median || /median/i.test(userAgent) || /gonative/i.test(userAgent)) {
+    return 'median'
+  }
+
+  // 检测 nativeify (Electron-based, Mac/Windows/Linux)
+  // nativeify 基于 Electron，但可能有自定义标识
+  if ((window as any).nativeify || (/Electron/i.test(userAgent) && (window as any).process?.versions?.electron)) {
+    return 'nativeify'
+  }
+
+  // 检测 Tauri
+  if ((window as any).__TAURI__) {
+    return 'tauri'
+  }
+
+  // 检测 Capacitor
+  if ((window as any).Capacitor) {
+    const platform = (window as any).Capacitor.getPlatform()
+    if (platform === 'ios') return 'ios'
+    if (platform === 'android') return 'android'
+    return 'capacitor'
+  }
+
+  if (/MicroMessenger/i.test(userAgent)) {
+    return 'wechat'
+  }
+
+  if (/Electron/i.test(userAgent)) {
+    return 'electron'
+  }
+
+  if ((window as any).ReactNativeWebView || /Android/i.test(userAgent)) {
+    return 'android'
+  }
+
+  if (/(iPhone|iPod|iPad)/i.test(userAgent) && !/(Safari)/i.test(userAgent)) {
+    return 'ios'
+  }
+
+  if (!isWebView()) {
+    return 'browser'
+  }
+
+  return 'unknown'
+}
+
+/**
+ * 获取运行平台（简化版）
+ */
+export function getPlatform(): 'ios' | 'android' | 'desktop' | 'web' {
+  const type = getWebViewType()
+
+  switch (type) {
+    case 'ios':
+    case 'capacitor':
+    case 'median': // median.co 支持 iOS/Android
+      return getMedianPlatform() // 需要进一步判断median是iOS还是Android
+    case 'android':
+      return 'android'
+    case 'tauri':
+    case 'electron':
+    case 'nativeify': // nativeify 是桌面端
+      return 'desktop'
+    default:
+      return 'web'
+  }
+}
+
+/**
+ * 判断 median.co 的具体平台
+ */
+function getMedianPlatform(): 'ios' | 'android' {
+  const userAgent = navigator.userAgent || ''
+  if (/(iPhone|iPod|iPad)/i.test(userAgent)) {
+    return 'ios'
+  }
+  return 'android'
+}
+
+/**
+ * 判断链接是否为内部链接
+ */
+export function isInternalLink(url: string): boolean {
+  if (!url) return false
+
+  try {
+    const link = new URL(url, window.location.origin)
+    return link.origin === window.location.origin
+  } catch {
+    // 相对路径视为内部链接
+    return !url.startsWith('http://') && !url.startsWith('https://')
+  }
+}
+
+/**
+ * 判断链接是否为SiteHub管理的站点链接
+ * （即用户添加的网站链接，这些应该在新标签页打开）
+ */
+export function isSiteHubManagedLink(element: HTMLElement): boolean {
+  // 检查是否在网站卡片或特定组件内
+  return !!(
+    element.closest('[data-site-card]') ||
+    element.closest('[data-external-link]') ||
+    element.closest('.site-card') ||
+    element.classList.contains('external-link')
+  )
+}
+
+/**
+ * 在WebView中打开链接的策略
+ */
+export interface WebViewLinkOptions {
+  /**
+   * 是否强制在WebView内部打开
+   */
+  forceInternal?: boolean
+
+  /**
+   * 是否强制在外部浏览器打开
+   */
+  forceExternal?: boolean
+
+  /**
+   * 自定义处理函数
+   */
+  customHandler?: (url: string) => void
+}
+
+/**
+ * ✅ 统一的链接打开函数（多端支持）
+ * 在 App 内打开链接，而不是跳转到外部浏览器
+ */
+export async function openInWebView(url: string, options: WebViewLinkOptions = {}): Promise<void> {
+  const { forceInternal = false, forceExternal = false, customHandler } = options
+
+  // 如果有自定义处理函数，优先使用
+  if (customHandler) {
+    customHandler(url)
+    return
+  }
+
+  const platform = getPlatform()
+  const isInternal = isInternalLink(url)
+
+  // 内部链接直接跳转
+  if (isInternal || forceInternal) {
+    window.location.href = url
+    return
+  }
+
+  // 强制外部打开
+  if (forceExternal) {
+    openInExternalBrowser(url, getWebViewType())
+    return
+  }
+
+  console.log(`[openInWebView] 平台: ${platform}, WebView类型: ${getWebViewType()}, URL: ${url}`)
+
+  const webViewType = getWebViewType()
+
+  // 根据平台选择打开方式
+  switch (platform) {
+    case 'ios':
+    case 'android':
+      // 🎯 median.co (iOS/Android) - 在当前WebView打开，不跳出App
+      if (webViewType === 'median') {
+        console.log('[openInWebView] median.co 检测到，在当前WebView打开')
+        // median.co: 直接在当前窗口打开，不会跳出App
+        window.location.href = url
+        return
+      }
+
+      // Capacitor InAppBrowser
+      if ((window as any).Capacitor?.Plugins?.Browser) {
+        try {
+          await (window as any).Capacitor.Plugins.Browser.open({
+            url: url,
+            presentationStyle: 'fullscreen',
+            toolbarColor: '#1e293b'
+          })
+          console.log('[openInWebView] 使用 Capacitor Browser 打开')
+          return
+        } catch (error) {
+          console.error('[openInWebView] Capacitor Browser 失败:', error)
+        }
+      }
+
+      // Fallback: 当前窗口打开
+      console.log('[openInWebView] 使用 Fallback: 当前窗口打开')
+      window.location.href = url
+      break
+
+    case 'desktop':
+      // 🎯 nativeify (Mac/Windows/Linux) - 在当前窗口打开，不跳出App
+      if (webViewType === 'nativeify') {
+        console.log('[openInWebView] nativeify 检测到，在当前WebView打开')
+        // nativeify: 直接在当前窗口打开，不会跳到系统浏览器
+        window.location.href = url
+        return
+      }
+
+      // Tauri - 稍后在下一个任务中实现
+      if ((window as any).__TAURI__) {
+        console.log('[openInWebView] Tauri 环境检测到，在当前窗口打开')
+        // 临时方案：在当前窗口打开
+        // TODO: 实现 Tauri 多窗口方案
+        window.location.href = url
+      } else {
+        // Electron 或其他桌面环境
+        console.log('[openInWebView] Electron/其他桌面环境，在当前窗口打开')
+        window.location.href = url
+      }
+      break
+
+    case 'web':
+    default:
+      // 浏览器环境：新标签页打开
+      console.log('[openInWebView] 浏览器环境，新标签页打开')
+      window.open(url, '_blank', 'noopener,noreferrer')
+      break
+  }
+}
+
+/**
+ * 在WebView环境中处理链接点击（旧版，保留向后兼容）
+ */
+export function handleWebViewLink(url: string, options: WebViewLinkOptions = {}): void {
+  openInWebView(url, options).catch(error => {
+    console.error('[handleWebViewLink] 打开链接失败:', error)
+    // Fallback: 使用传统方式
+    window.location.href = url
+  })
+}
+
+/**
+ * 在外部浏览器中打开链接（针对WebView环境）
+ */
+function openInExternalBrowser(url: string, webViewType: ReturnType<typeof getWebViewType>): void {
+  // 尝试通过WebView提供的接口打开外部浏览器
+
+  // React Native WebView
+  if ((window as any).ReactNativeWebView) {
+    (window as any).ReactNativeWebView.postMessage(JSON.stringify({
+      type: 'OPEN_EXTERNAL',
+      url: url
+    }))
+    return
+  }
+
+  // iOS WKWebView
+  if ((window as any).webkit?.messageHandlers?.openExternal) {
+    (window as any).webkit.messageHandlers.openExternal.postMessage({ url })
+    return
+  }
+
+  // Android WebView
+  if ((window as any).Android?.openExternal) {
+    (window as any).Android.openExternal(url)
+    return
+  }
+
+  // 微信环境
+  if (webViewType === 'wechat') {
+    // 微信中无法直接打开外部浏览器，提示用户在浏览器中打开
+    alert('请点击右上角菜单，选择"在浏览器中打开"')
+    return
+  }
+
+  // 默认：在当前窗口打开
+  window.location.href = url
+}
+
+/**
+ * 为所有外部链接添加WebView兼容处理
+ * 在应用初始化时调用一次
+ */
+export function setupWebViewLinkHandlers(): void {
+  if (typeof window === 'undefined' || !isWebView()) {
+    return
+  }
+
+  // 拦截所有链接点击
+  document.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement
+    const link = target.closest('a') as HTMLAnchorElement
+
+    if (!link || !link.href) {
+      return
+    }
+
+    // 检查是否为SiteHub管理的站点链接
+    if (isSiteHubManagedLink(link)) {
+      // 让组件自己的onClick处理
+      return
+    }
+
+    // 检查链接是否有特殊属性
+    const forceInternal = link.hasAttribute('data-webview-internal')
+    const forceExternal = link.hasAttribute('data-webview-external')
+
+    // 如果是普通的外部链接，在WebView中默认当前窗口打开
+    if (!isInternalLink(link.href) && !forceExternal) {
+      e.preventDefault()
+      handleWebViewLink(link.href, { forceInternal })
+    }
+  }, true)
+
+  console.log('[WebView] Link handlers initialized for', getWebViewType())
+}
+
+/**
+ * 获取WebView环境信息（用于调试）
+ */
+export function getWebViewInfo() {
+  return {
+    isWebView: isWebView(),
+    type: getWebViewType(),
+    userAgent: navigator.userAgent,
+    standalone: (navigator as any).standalone,
+    displayMode: window.matchMedia('(display-mode: standalone)').matches ? 'standalone' : 'browser',
+  }
+}
+=== /Users/8086k/project/components/lib/wechat-auth.ts ===
+// @ts-ignore
+import OAuth from 'wechat-oauth'
+import { supabase } from './supabase'
+
+interface WeChatTokenResult {
+  data: {
+    access_token: string
+    openid: string
+    refresh_token: string
+    scope: string
+    unionid?: string
+  }
+}
+
+interface WeChatUserInfo {
+  openid: string
+  nickname: string
+  sex: number
+  province: string
+  city: string
+  country: string
+  headimgurl: string
+  privilege: string[]
+  unionid?: string
+}
+
+// Initialize WeChat OAuth client
+const client = new OAuth(
+  process.env.NEXT_PUBLIC_WECHAT_APP_ID!,
+  process.env.WECHAT_APP_SECRET!
+)
+
+export const wechatAuth = {
+  getAuthUrl: () => {
+    const state = Math.random().toString(36).substring(7)
+    return client.getAuthorizeURL(
+      `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/auth/wechat/callback`,
+      state,
+      'snsapi_userinfo'
+    )
+  },
+
+  getAccessToken: (code: string): Promise<WeChatTokenResult> => {
+    return new Promise((resolve, reject) => {
+      client.getAccessToken(code, (err: any, result: WeChatTokenResult) => {
+        if (err) reject(err)
+        else resolve(result)
+      })
+    })
+  },
+
+  getUserInfo: (openid: string, accessToken: string): Promise<WeChatUserInfo> => {
+    return new Promise((resolve, reject) => {
+      client.getUser(openid, accessToken, (err: any, result: WeChatUserInfo) => {
+        if (err) reject(err)
+        else resolve(result)
+      })
+    })
+  },
+
+  // New method to handle WeChat user authentication with Supabase
+  authenticateUser: async (userInfo: WeChatUserInfo) => {
+    try {
+      // First, try to find existing user by WeChat openid
+      const { data: existingUser, error: fetchError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('wechat_openid', userInfo.openid)
+        .single()
+
+      if (existingUser) {
+        // User exists, create a session
+        const { data: sessionData, error: sessionError } = await supabase.auth.signInWithPassword({
+          email: existingUser.email,
+          password: 'wechat_user_' + userInfo.openid // This should be handled differently in production
+        })
+        
+        if (sessionError) {
+          throw sessionError
+        }
+        
+        return { user: existingUser, isNew: false }
+      } else {
+        // Create new user
+        const email = `${userInfo.openid}@wechat.local`
+        const password = 'wechat_user_' + userInfo.openid + '_' + Math.random().toString(36).substring(7)
+        
+        const { data: authData, error: authError } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: {
+              provider: 'wechat',
+              wechat_openid: userInfo.openid,
+              wechat_unionid: userInfo.unionid,
+              nickname: userInfo.nickname,
+              avatar_url: userInfo.headimgurl,
+              full_name: userInfo.nickname,
+              city: userInfo.city,
+              province: userInfo.province,
+              country: userInfo.country
+            }
+          }
+        })
+
+        if (authError) {
+          throw authError
+        }
+
+        return { user: authData.user, isNew: true }
+      }
+    } catch (error) {
+      console.error('WeChat authentication error:', error)
+      throw error
+    }
+  }
+} === /Users/8086k/project/components/next-env.d.ts ===
+/// <reference types="next" />
+/// <reference types="next/image-types/global" />
+/// <reference types="next/navigation-types/compat/navigation" />
+
+// NOTE: This file should not be edited
+// see https://nextjs.org/docs/app/building-your-application/configuring/typescript for more information.
+=== /Users/8086k/project/components/pages/api/auth-cn.ts ===
+import type { NextApiRequest, NextApiResponse } from 'next'
+import cloudbase from '@cloudbase/node-sdk'
+import bcrypt from 'bcryptjs'
+import * as jwt from 'jsonwebtoken'
+
+/**
+ * 国内用户邮箱注册/登录 API
+ * 使用腾讯云 CloudBase Node.js SDK 数据库集合
+ * 
+ * 与 app/api/auth/email/route.ts 中的逻辑一致，
+ * 但这是一个独立的 API 接口，专门用于国内用户认证测试
+ */
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
+  // ✅ 诊断日志 1: 打印完整请求体
+  console.log("✅ [API Received]: ", JSON.stringify(req.body, null, 2))
+  
+  // 只接受 POST 请求
+  if (req.method !== 'POST') {
+    return res.status(405).json({ 
+      success: false, 
+      message: 'Method not allowed' 
+    })
+  }
+
+  try {
+    const { email, password, action = 'signup' } = req.body
+    
+    // ✅ 诊断日志 2: 打印提取的 email 和 action
+    console.log(`✅ [Action]: ${action}, [Email to Check]: ${email}`)
+
+    // 验证请求参数
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: '请提供邮箱和密码'
+      })
+    }
+
+    // 验证密码长度
+    if (password.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: '密码至少需要6位'
+      })
+    }
+
+    // 初始化 CloudBase App 实例
+    const app = cloudbase.init({
+      env: process.env.TENCENT_ENV_ID || process.env.NEXT_PUBLIC_WECHAT_CLOUDBASE_ID,
+      secretId: process.env.TENCENT_SECRET_ID || process.env.CLOUDBASE_SECRET_ID,
+      secretKey: process.env.TENCENT_SECRET_KEY || process.env.CLOUDBASE_SECRET_KEY
+    })
+
+    const db = app.database()
+    const usersCollection = db.collection('web_users')
+
+    if (action === 'signup') {
+      // 注册逻辑
+      try {
+        // ✅ 诊断日志 3: 在数据库查询之前打印即将查询的 email
+        console.log(`🔍 [Querying Database For]: ${email}`)
+        
+        // 先检查邮箱是否已存在
+        const existingUserResult = await usersCollection.where({ email }).get()
+        console.log(`🔍 [Existing User Check]: Found ${existingUserResult.data?.length || 0} user(s)`)
+        
+        if (existingUserResult.data && existingUserResult.data.length > 0) {
+          console.log(`⚠️ [Email Already Exists]: ${email}`)
+          return res.status(400).json({
+            success: false,
+            message: '该邮箱已被注册'
+          })
+        }
+        
+        // 加密密码
+        const hashedPassword = await bcrypt.hash(password, 10)
+
+        // 创建新用户
+        const newUser = {
+          email: email,
+          password: hashedPassword,
+          name: email.includes('@') ? email.split('@')[0] : email,
+          pro: false,
+          region: 'china',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        }
+
+        console.log('✅ [Creating User]:', JSON.stringify(newUser, null, 2))
+        const result = await usersCollection.add(newUser)
+        console.log(`✅ [User Created Successfully]: ID=${result.id}, Email=${email}`)
+
+        // 生成 JWT Token（注册成功后自动登录）
+        // 注意：CloudBase add() 返回的 result.id 就是文档的 _id
+        const tokenPayload = {
+          userId: result.id, // CloudBase add() 返回的 id 就是 _id
+          email: email,
+          region: 'china'
+        }
+
+        // ✅ 动态设置 Token 有效期：普通用户 30 天，高级会员 90 天（多端持久化优化）
+        const expiresIn = newUser.pro ? '90d' : '30d'
+
+        const token = jwt.sign(
+          tokenPayload,
+          process.env.JWT_SECRET || 'fallback-secret-key-for-development-only',
+          { expiresIn: expiresIn }
+        )
+
+        console.log(`✅ [JWT Token Generated]: For new user ${email}`)
+
+        return res.status(200).json({
+          success: true,
+          message: '注册成功',
+          user: {
+            id: result.id, // 返回给前端的用户ID
+            userId: result.id, // 确保userId字段也存在
+            email,
+            name: newUser.name,
+            pro: false,
+            region: 'china'
+          },
+          token: token // 返回 JWT Token，让用户注册后自动登录
+        })
+      } catch (error: any) {
+        console.error('注册错误:', error)
+        console.error('错误详情:', JSON.stringify(error, null, 2))
+        
+        // 检查是否是邮箱已存在的错误
+        if (error.message && (
+          error.message.includes('duplicate') || 
+          error.message.includes('E11000') ||
+          error.message.includes('已存在')
+        )) {
+          return res.status(400).json({
+            success: false,
+            message: '该邮箱已被注册'
+          })
+        }
+        
+        return res.status(400).json({
+          success: false,
+          message: error.message || '注册失败，请稍后重试'
+        })
+      }
+    } else if (action === 'login') {
+      // 登录逻辑
+      try {
+        // ✅ 诊断日志: 在登录查询之前打印即将查询的 email
+        console.log(`🔍 [Login - Querying Database For]: ${email}`)
+        
+        // 查找用户
+        const userResult = await usersCollection.where({ email }).get()
+        console.log(`🔍 [Login - Found]: ${userResult.data?.length || 0} user(s)`)
+
+        if (!userResult.data || userResult.data.length === 0) {
+          return res.status(400).json({
+            success: false,
+            message: '用户不存在或密码错误'
+          })
+        }
+
+        const user = userResult.data[0]
+
+        // 验证密码
+        // 🤫 诊断日志：打印要比较的密码信息
+        console.log(`🤫 [Password to Compare]: Plain text from user -> ${password}`)
+        console.log(`🤫 [Password to Compare]: Hash from DB -> ${user.password}`)
+        
+        const isPasswordValid = await bcrypt.compare(password, user.password)
+        
+        // 🤔 诊断日志：打印 bcrypt.compare 的结果
+        console.log(`🤔 [bcrypt.compare Result]: ${isPasswordValid}`)
+        
+        if (!isPasswordValid) {
+          console.log(`❌ [Login Failed]: Password mismatch for email ${email}`)
+          return res.status(400).json({
+            success: false,
+            message: '用户不存在或密码错误'
+          })
+        }
+        
+        console.log(`✅ [Login Success]: User ${email} logged in successfully`)
+
+        // 生成 JWT Token
+        const tokenPayload = {
+          userId: user._id,
+          email: user.email,
+          region: 'china'
+        }
+
+        // ✅ 动态设置 Token 有效期：普通用户 30 天，高级会员 90 天（多端持久化优化）
+        const expiresIn = user.pro ? '90d' : '30d'
+
+        const token = jwt.sign(
+          tokenPayload,
+          process.env.JWT_SECRET || 'fallback-secret-key-for-development-only',
+          { expiresIn: expiresIn }
+        )
+
+        console.log(`✅ [JWT Token Generated]: For user ${email}`)
+
+        return res.status(200).json({
+          success: true,
+          message: '登录成功',
+          user: {
+            id: user._id, // 返回给前端的用户ID
+            userId: user._id, // 确保userId字段也存在（与JWT token中的userId一致）
+            email: user.email,
+            name: user.name,
+            pro: user.pro || false,
+            region: 'china'
+          },
+          token: token // 返回 JWT Token
+        })
+      } catch (error: any) {
+        console.error('登录错误:', error)
+        return res.status(400).json({
+          success: false,
+          message: error.message || '邮箱或密码错误'
+        })
+      }
+    } else if (action === 'refresh') {
+      // ✅ Token刷新逻辑
+      try {
+        const { userId } = req.body
+
+        if (!userId) {
+          return res.status(400).json({
+            success: false,
+            message: '缺少 userId 参数'
+          })
+        }
+
+        console.log(`🔄 [Token Refresh]: 开始刷新用户 ${userId} 的Token`)
+
+        // 从CloudBase获取用户信息
+        const cloudbaseDB = cloudbaseApp.database()
+        const userResult = await cloudbaseDB
+          .collection('web_users')
+          .doc(userId)
+          .get()
+
+        if (!userResult.data || userResult.data.length === 0) {
+          return res.status(404).json({
+            success: false,
+            message: '用户不存在'
+          })
+        }
+
+        const user = userResult.data[0]
+
+        // 生成新的JWT Token
+        const tokenPayload = {
+          userId: user._id,
+          email: user.email,
+          region: 'china'
+        }
+
+        // ✅ 根据用户会员状态设置有效期
+        const expiresIn = user.pro ? '90d' : '30d'
+
+        const newToken = jwt.sign(
+          tokenPayload,
+          process.env.JWT_SECRET || 'fallback-secret-key-for-development-only',
+          { expiresIn: expiresIn }
+        )
+
+        console.log(`✅ [Token Refreshed]: For user ${user.email}, expires in ${expiresIn}`)
+
+        return res.status(200).json({
+          success: true,
+          message: 'Token刷新成功',
+          token: newToken,
+          expiresIn: expiresIn
+        })
+      } catch (error: any) {
+        console.error('Token刷新错误:', error)
+        return res.status(400).json({
+          success: false,
+          message: error.message || 'Token刷新失败'
+        })
+      }
+    } else {
+      return res.status(400).json({
+        success: false,
+        message: '无效的 action 参数，请使用 signup, login 或 refresh'
+      })
+    }
+
+  } catch (error: any) {
+    console.error('API 错误:', error)
+    return res.status(500).json({
+      success: false,
+      message: error.message || '服务器错误'
+    })
+  }
+}
+
+=== /Users/8086k/project/components/pages/api/custom-sites-cn.ts ===
+import type { NextApiRequest, NextApiResponse } from 'next'
+import cloudbase from '@cloudbase/node-sdk'
+import jwt from 'jsonwebtoken'
+
+/**
+ * 国内用户自定义网站 API
+ * 使用腾讯云 CloudBase 数据库
+ * Collection: web_custom_sites
+ */
+
+function verifyToken(token: string): any {
+  try {
+    return jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret-key-for-development-only')
+  } catch (error) {
+    console.error('❌ [Custom-Sites-CN] Token验证失败:', error)
+    return null
+  }
+}
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  // 验证JWT Token
+  const authHeader = req.headers.authorization
+  if (!authHeader?.startsWith('Bearer ')) {
+    return res.status(401).json({ success: false, message: '未授权' })
+  }
+
+  const token = authHeader.substring(7)
+  const decoded = verifyToken(token)
+
+  console.log('🔍 [Custom-Sites-CN] Token decoded:', decoded)
+
+  if (!decoded?.userId) {
+    console.error('❌ [Custom-Sites-CN] Token无效或缺少userId')
+    return res.status(401).json({ success: false, message: 'Token无效' })
+  }
+
+  const userId = decoded.userId
+  console.log('✅ [Custom-Sites-CN] Using userId from token:', userId)
+
+  // 初始化 CloudBase
+  const app = cloudbase.init({
+    env: process.env.NEXT_PUBLIC_WECHAT_CLOUDBASE_ID!,
+    secretId: process.env.CLOUDBASE_SECRET_ID!,
+    secretKey: process.env.CLOUDBASE_SECRET_KEY!
+  })
+
+  const db = app.database()
+  const collection = db.collection('web_custom_sites')
+
+  try {
+    // GET: 获取自定义网站列表
+    if (req.method === 'GET') {
+      console.log('📖 [Custom-Sites-CN GET] Querying custom sites for userId:', userId)
+      const result = await collection
+        .where({ user_id: userId })
+        .orderBy('created_at', 'desc')
+        .get()
+
+      console.log(`✅ [Custom-Sites-CN GET] Found ${result.data?.length || 0} custom sites`)
+      console.log('📊 [Custom-Sites-CN GET] Data:', JSON.stringify(result.data, null, 2))
+
+      return res.status(200).json({
+        success: true,
+        sites: result.data || []
+      })
+    }
+
+    // POST: 添加自定义网站
+    if (req.method === 'POST') {
+      const { name, url, logo, category, description } = req.body
+
+      if (!name || !url) {
+        return res.status(400).json({ success: false, message: '缺少name或url' })
+      }
+
+      console.log('➕ [Custom-Sites-CN POST] Adding custom site:', { userId, name, url })
+
+      const addResult = await collection.add({
+        user_id: userId,
+        name,
+        url,
+        logo: logo || '',
+        category: category || 'custom',
+        description: description || '',
+        created_at: new Date(),
+        updated_at: new Date()
+      })
+
+      console.log('✅ [Custom-Sites-CN POST] Custom site added successfully:', addResult)
+
+      return res.status(200).json({
+        success: true,
+        site: {
+          id: addResult.id,
+          user_id: userId,
+          name,
+          url,
+          logo,
+          category,
+          description
+        }
+      })
+    }
+
+    // DELETE: 删除自定义网站
+    if (req.method === 'DELETE') {
+      const { siteId } = req.body
+
+      if (!siteId) {
+        return res.status(400).json({ success: false, message: '缺少siteId' })
+      }
+
+      console.log('🗑️ [Custom-Sites-CN DELETE] Deleting custom site:', { userId, siteId })
+
+      // 先验证这个网站是否属于当前用户
+      const checkResult = await collection
+        .where({
+          _id: siteId,
+          user_id: userId
+        })
+        .get()
+
+      if (!checkResult.data || checkResult.data.length === 0) {
+        return res.status(404).json({ success: false, message: '网站不存在或无权删除' })
+      }
+
+      await collection.doc(siteId).remove()
+
+      console.log('✅ [Custom-Sites-CN DELETE] Custom site deleted successfully')
+
+      return res.status(200).json({ success: true })
+    }
+
+    // 不支持的方法
+    return res.status(405).json({ success: false, message: '方法不支持' })
+
+  } catch (error: any) {
+    console.error('❌ [Custom-Sites-CN] Error:', error)
+    return res.status(500).json({
+      success: false,
+      message: error.message || '服务器错误'
+    })
+  }
+}
+=== /Users/8086k/project/components/pages/api/favorites-cn.ts ===
+import type { NextApiRequest, NextApiResponse } from 'next'
+import cloudbase from '@cloudbase/node-sdk'
+import jwt from 'jsonwebtoken'
+
+/**
+ * 国内用户收藏功能 API（使用已有依赖，不引入新包）
+ */
+
+function verifyToken(token: string): any {
+  try {
+    return jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret-key-for-development-only')
+  } catch (error) {
+    return null
+  }
+}
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  try {
+    const authHeader = req.headers.authorization
+    if (!authHeader?.startsWith('Bearer ')) {
+      return res.status(401).json({ success: false, message: '未授权' })
+    }
+
+    const token = authHeader.substring(7)
+    const decoded = verifyToken(token)
+
+    console.log('🔍 [Favorites-CN] Token decoded:', decoded)
+
+    if (!decoded?.userId) {
+      console.error('❌ [Favorites-CN] Token无效或缺少userId')
+      return res.status(401).json({ success: false, message: 'Token无效' })
+    }
+
+    const userId = decoded.userId
+    console.log('✅ [Favorites-CN] Using userId from token:', userId)
+
+    // 初始化 CloudBase（使用已有依赖）
+    const app = cloudbase.init({
+      env: process.env.NEXT_PUBLIC_WECHAT_CLOUDBASE_ID!,
+      secretId: process.env.CLOUDBASE_SECRET_ID!,
+      secretKey: process.env.CLOUDBASE_SECRET_KEY!
+    })
+
+    const db = app.database()
+    const collection = db.collection('web_favorites')
+
+    // GET: 获取收藏列表
+    if (req.method === 'GET') {
+      console.log('📖 [Favorites-CN GET] Querying favorites for userId:', userId)
+      const result = await collection.where({ user_id: userId }).get()
+      console.log(`✅ [Favorites-CN GET] Found ${result.data?.length || 0} favorites`)
+      console.log('📊 [Favorites-CN GET] Data:', JSON.stringify(result.data, null, 2))
+      return res.status(200).json({
+        success: true,
+        favorites: result.data.map((f: any) => f.site_id)
+      })
+    }
+
+    // POST: 添加收藏
+    if (req.method === 'POST') {
+      const { siteId } = req.body
+      if (!siteId) {
+        return res.status(400).json({ success: false, message: '缺少siteId' })
+      }
+
+      console.log('➕ [Favorites-CN POST] Adding favorite:', { userId, siteId })
+      const addResult = await collection.add({
+        user_id: userId,
+        site_id: siteId,
+        created_at: new Date()
+      })
+      console.log('✅ [Favorites-CN POST] Favorite added successfully:', addResult)
+
+      return res.status(200).json({ success: true })
+    }
+
+    // DELETE: 删除收藏
+    if (req.method === 'DELETE') {
+      const { siteId } = req.body
+      if (!siteId) {
+        return res.status(400).json({ success: false, message: '缺少siteId' })
+      }
+
+      await collection.where({ user_id: userId, site_id: siteId }).remove()
+      return res.status(200).json({ success: true })
+    }
+
+    return res.status(405).json({ success: false, message: 'Method not allowed' })
+  } catch (error: any) {
+    console.error('API错误:', error)
+    return res.status(500).json({ success: false, message: error.message })
+  }
+}
+=== /Users/8086k/project/components/tailwind.config.ts ===
+import type { Config } from "tailwindcss";
+
+// all in fixtures is set to tailwind v3 as interims solutions
+
+const config: Config = {
+    darkMode: ["class"],
+    content: [
+    "./pages/**/*.{js,ts,jsx,tsx,mdx}",
+    "./components/**/*.{js,ts,jsx,tsx,mdx}",
+    "./app/**/*.{js,ts,jsx,tsx,mdx}",
+    "*.{js,ts,jsx,tsx,mdx}"
+  ],
+  theme: {
+  	extend: {
+  		colors: {
+  			background: 'hsl(var(--background))',
+  			foreground: 'hsl(var(--foreground))',
+  			card: {
+  				DEFAULT: 'hsl(var(--card))',
+  				foreground: 'hsl(var(--card-foreground))'
+  			},
+  			popover: {
+  				DEFAULT: 'hsl(var(--popover))',
+  				foreground: 'hsl(var(--popover-foreground))'
+  			},
+  			primary: {
+  				DEFAULT: 'hsl(var(--primary))',
+  				foreground: 'hsl(var(--primary-foreground))'
+  			},
+  			secondary: {
+  				DEFAULT: 'hsl(var(--secondary))',
+  				foreground: 'hsl(var(--secondary-foreground))'
+  			},
+  			muted: {
+  				DEFAULT: 'hsl(var(--muted))',
+  				foreground: 'hsl(var(--muted-foreground))'
+  			},
+  			accent: {
+  				DEFAULT: 'hsl(var(--accent))',
+  				foreground: 'hsl(var(--accent-foreground))'
+  			},
+  			destructive: {
+  				DEFAULT: 'hsl(var(--destructive))',
+  				foreground: 'hsl(var(--destructive-foreground))'
+  			},
+  			border: 'hsl(var(--border))',
+  			input: 'hsl(var(--input))',
+  			ring: 'hsl(var(--ring))',
+  			chart: {
+  				'1': 'hsl(var(--chart-1))',
+  				'2': 'hsl(var(--chart-2))',
+  				'3': 'hsl(var(--chart-3))',
+  				'4': 'hsl(var(--chart-4))',
+  				'5': 'hsl(var(--chart-5))'
+  			},
+  			sidebar: {
+  				DEFAULT: 'hsl(var(--sidebar-background))',
+  				foreground: 'hsl(var(--sidebar-foreground))',
+  				primary: 'hsl(var(--sidebar-primary))',
+  				'primary-foreground': 'hsl(var(--sidebar-primary-foreground))',
+  				accent: 'hsl(var(--sidebar-accent))',
+  				'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
+  				border: 'hsl(var(--sidebar-border))',
+  				ring: 'hsl(var(--sidebar-ring))'
+  			}
+  		},
+  		borderRadius: {
+  			lg: 'var(--radius)',
+  			md: 'calc(var(--radius) - 2px)',
+  			sm: 'calc(var(--radius) - 4px)'
+  		},
+  		keyframes: {
+  			'accordion-down': {
+  				from: {
+  					height: '0'
+  				},
+  				to: {
+  					height: 'var(--radix-accordion-content-height)'
+  				}
+  			},
+  			'accordion-up': {
+  				from: {
+  					height: 'var(--radix-accordion-content-height)'
+  				},
+  				to: {
+  					height: '0'
+  				}
+  			}
+  		},
+  		animation: {
+  			'accordion-down': 'accordion-down 0.2s ease-out',
+  			'accordion-up': 'accordion-up 0.2s ease-out'
+  		}
+  	}
+  },
+  plugins: [require("tailwindcss-animate")],
+};
+export default config;

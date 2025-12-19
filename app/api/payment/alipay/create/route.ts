@@ -1,16 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
-import * as AlipaySdk from 'alipay-sdk'
+import { AlipaySdk } from 'alipay-sdk'
 import { createClient } from '@supabase/supabase-js'
+import { createDatabaseAdapter } from '@/lib/database/adapter'
+import { CloudBaseAdapter } from '@/lib/database/cloudbase-adapter'
+import { SupabaseAdapter } from '@/lib/database/supabase-adapter'
 
-// 支付宝支付配置
+// 支付宝支付配置 - 只支持公钥模式
 const alipayConfig = {
-  appId: process.env.ALIPAY_APP_ID || '2021005199628151',
-  privateKey: process.env.ALIPAY_PRIVATE_KEY || '',
-  alipayPublicKey: process.env.ALIPAY_PUBLIC_KEY || '',
-  gateway: process.env.ALIPAY_GATEWAY || 'https://openapi.alipay.com/gateway.do',
+  appId: process.env.ALIPAY_APP_ID,
+  privateKey: process.env.ALIPAY_PRIVATE_KEY,
+  alipayPublicKey: process.env.ALIPAY_PUBLIC_KEY,
+  gateway: process.env.ALIPAY_GATEWAY,
   signType: 'RSA2',
   charset: 'utf-8',
   version: '1.0',
+  timeout: 30000,
+  camelcase: false, // 使用下划线命名
 }
 
 // 定价配置（与 Stripe/PayPal 保持一致）
@@ -28,21 +33,33 @@ const pricingConfig = {
 // 汇率配置（美元转人民币，假设汇率 1 USD = 7.2 CNY）
 const USD_TO_CNY_RATE = 7.2
 
+// 地区检测
+const DEPLOYMENT_REGION = process.env.NEXT_PUBLIC_DEPLOYMENT_REGION || 'china'
+const IS_CHINA_DEPLOYMENT = DEPLOYMENT_REGION === 'china'
+
+// 生成唯一的支付ID（与mvp_modules-main保持一致）
+function generatePaymentId(): string {
+  return `pay_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+}
+
 export async function POST(req: NextRequest) {
   try {
-    // Supabase 客户端
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co',
-      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder_key'
-    )
-    console.log('🔵 [Alipay] 开始创建支付订单...')
+    console.log('🔵 [Alipay] 开始创建支付订单...', { region: DEPLOYMENT_REGION })
 
     // 检查支付宝配置
+    console.log('🔍 [Alipay] 检查环境变量配置:', {
+      ALIPAY_APP_ID: alipayConfig.appId ? '已配置' : '未配置',
+      ALIPAY_PRIVATE_KEY: alipayConfig.privateKey ? '已配置' : '未配置',
+      ALIPAY_PUBLIC_KEY: alipayConfig.alipayPublicKey ? '已配置' : '未配置',
+      ALIPAY_GATEWAY: alipayConfig.gateway ? '已配置' : '未配置',
+    })
+
     if (!alipayConfig.appId || !alipayConfig.privateKey || !alipayConfig.alipayPublicKey) {
       console.error('❌ [Alipay] 配置缺失:', {
         hasAppId: !!alipayConfig.appId,
         hasPrivateKey: !!alipayConfig.privateKey,
         hasPublicKey: !!alipayConfig.alipayPublicKey,
+        ALIPAY_APP_ID: alipayConfig.appId || 'null/undefined',
       })
       return NextResponse.json(
         {
@@ -54,10 +71,46 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const body = await req.json()
-    const { planType, billingCycle, userEmail } = body
+    // 类型断言：此时配置已验证不为undefined
+    const validatedConfig = alipayConfig as {
+      appId: string;
+      privateKey: string;
+      alipayPublicKey: string;
+      gateway: string;
+      signType: string;
+      charset: string;
+      version: string;
+      timeout: number;
+      camelcase: boolean;
+    }
 
-    console.log('📝 [Alipay] 订单信息:', { planType, billingCycle, userEmail })
+    const body = await req.json()
+    const { planType, billingCycle, userEmail, userId: requestUserId } = body
+
+    console.log('📝 [Alipay] 订单信息:', { planType, billingCycle, userEmail, userId: requestUserId })
+
+    // 获取用户信息（用于数据库适配器）
+    const authHeader = req.headers.get('authorization')
+    let userId = requestUserId || ''
+
+    if (authHeader) {
+      // 如果有认证头，解析用户信息
+      try {
+        const token = authHeader.replace('Bearer ', '')
+        // 这里需要根据你的认证系统解析token获取用户ID和邮箱
+        // 暂时从请求体获取
+      } catch (error) {
+        console.warn('⚠️ [Alipay] 无法解析认证token')
+      }
+    }
+
+    if (!userId && IS_CHINA_DEPLOYMENT) {
+      console.error('❌ [Alipay] 国内版需要提供userId')
+      return NextResponse.json(
+        { error: 'User ID is required for domestic deployment' },
+        { status: 400 }
+      )
+    }
 
     // 验证输入
     if (!planType || !billingCycle || !userEmail) {
@@ -87,76 +140,108 @@ export async function POST(req: NextRequest) {
       rate: USD_TO_CNY_RATE,
     })
 
-    // 生成订单号
-    const outTradeNo = `ALIPAY_${planType.toUpperCase()}_${billingCycle.toUpperCase()}_${Date.now()}`
+    // 生成订单号（与mvp_modules-main保持一致）
+    const outTradeNo = generatePaymentId()
 
-    // 订单描述
-    const subject = `SiteHub ${planType.charAt(0).toUpperCase() + planType.slice(1)} - ${
-      billingCycle === 'monthly' ? 'Monthly' : 'Yearly'
-    }`
-    const body_text = `SiteHub ${planType} subscription - ${billingCycle} billing`
+    // 订单描述（与mvp_modules-main保持一致）
+    const description = `${billingCycle === "monthly" ? "1 Month" : "1 Year"} Premium Membership (One-time Payment)`
 
     // 初始化支付宝 SDK
-    const alipaySdk = new AlipaySdk(alipayConfig)
+    const alipaySdk = new AlipaySdk(validatedConfig as any)
 
-    // 创建支付宝订单参数
-    const formData = {
-      method: 'alipay.trade.page.pay', // PC网站支付
-      bizContent: {
-        out_trade_no: outTradeNo,
-        product_code: 'FAST_INSTANT_TRADE_PAY',
-        total_amount: amountCNY,
-        subject: subject,
-        body: body_text,
-        passback_params: userEmail, // ✅ 传递用户邮箱，用于 webhook 识别用户
-      },
-      returnUrl: `${process.env.NEXT_PUBLIC_SITE_URL}/payment/success?session_id=${outTradeNo}`,
-      notifyUrl: `${process.env.NEXT_PUBLIC_SITE_URL}/api/payment/alipay/notify`,
+    // 转换金额为数字（与mvp_modules-main保持一致）
+    const amountNum = parseFloat(amountCNY)
+
+    // 创建支付宝订单参数（与mvp_modules-main完全一致）
+    const bizContent = {
+      out_trade_no: outTradeNo, // 必需：商户订单号
+      total_amount: amountNum.toFixed(2), // 必需：订单总金额，单位元，精确到小数点后两位
+      subject: description, // 必需：订单标题，最长256字符（使用description而不是自定义字符串）
+      product_code: 'FAST_INSTANT_TRADE_PAY', // 电脑网站支付
+      passback_params: userId || "", // ✅ 传递用户ID，支付宝会原样返回
+      // ✅ 重要：notify_url 和 return_url 必须在 bizContent 中，支付宝才会异步回调
+      notify_url: `${process.env.NEXT_PUBLIC_SITE_URL}/api/payment/alipay/notify`,
+      return_url: `${process.env.NEXT_PUBLIC_SITE_URL}/payment/success?session_id=${outTradeNo}`,
     }
 
-    console.log('📤 [Alipay] 支付宝请求参数:', formData)
+    console.log('📤 [Alipay] 支付宝请求参数:', { bizContent })
 
-    // 生成支付链接
-    const paymentUrl = await alipaySdk.pageExec(formData.method, 'GET', formData.bizContent, {
-      returnUrl: formData.returnUrl,
-      notifyUrl: formData.notifyUrl,
+    // 生成支付链接（与mvp_modules-main完全一致）
+    const method = 'alipay.trade.page.pay'
+    const orderData = {
+      method,
+      bizContent,
+    }
+
+    const paymentUrl = await (alipaySdk as any).pageExec(orderData.method, {
+      return_url: orderData.bizContent.return_url,
+      notify_url: orderData.bizContent.notify_url,
+      bizContent: orderData.bizContent,
     })
 
     console.log('✅ [Alipay] 支付链接生成成功')
 
-    // 保存订单到数据库（使用正确的表名和字段）
+    // 保存订单到数据库（使用数据库适配器）
     const amountInCents = Math.round(parseFloat(amountCNY) * 100) // 转换为分
     const paymentFee = Math.round(amountInCents * 0.006) // 支付宝手续费约 0.6%
     const netAmount = amountInCents - paymentFee
-    
-    const { error: dbError } = await supabase.from('web_payment_transactions').insert({
-      user_email: userEmail,
-      product_name: 'sitehub',
-      plan_type: planType,
-      billing_cycle: billingCycle,
-      payment_method: 'alipay',
-      payment_status: 'pending',
-      transaction_type: 'purchase',
-      currency: 'CNY',
-      gross_amount: amountInCents,
-      payment_fee: paymentFee,
-      net_amount: netAmount,
-      service_cost: 0,
-      profit: netAmount,
-      transaction_id: outTradeNo,
-      payment_time: new Date().toISOString(),
-      metadata: {
-        planType,
-        billingCycle,
-        amountUSD,
-        amountCNY: parseFloat(amountCNY),
-      },
-    })
 
-    if (dbError) {
-      console.error('⚠️ [Alipay] 数据库保存失败 (不影响支付):', dbError)
-    } else {
-      console.log('✅ [Alipay] 订单已保存到数据库')
+    try {
+      console.log('🔧 [Alipay] 准备保存订单到数据库...', { userId, IS_CHINA_DEPLOYMENT })
+
+      // 创建数据库适配器
+      const dbAdapter = IS_CHINA_DEPLOYMENT ?
+        new CloudBaseAdapter(userId) :
+        new SupabaseAdapter(userId)
+
+      console.log('🔧 [Alipay] 数据库适配器创建成功')
+
+      // 适配不同数据库的字段结构
+      const transactionData = IS_CHINA_DEPLOYMENT ? {
+        // CloudBase字段结构
+        user_id: userId,
+        product_name: 'sitehub',
+        plan_type: planType,
+        billing_cycle: billingCycle,
+        payment_method: 'alipay',
+        payment_status: 'pending',
+        transaction_type: 'purchase',
+        currency: 'CNY',
+        gross_amount: amountInCents,
+        payment_fee: paymentFee,
+        net_amount: netAmount,
+        profit: netAmount,
+        transaction_id: outTradeNo,
+        payment_time: new Date().toISOString()
+      } : {
+        // Supabase字段结构
+        user_email: userEmail,
+        plan_type: planType,
+        billing_cycle: billingCycle,
+        amount_usd: amountUSD,
+        amount_cny: parseFloat(amountCNY),
+        payment_method: 'alipay',
+        transaction_id: outTradeNo,
+        status: 'pending'
+      }
+
+      console.log('🔧 [Alipay] 准备保存数据:', transactionData)
+
+      const saveSuccess = await dbAdapter.savePaymentTransaction(transactionData)
+
+      if (!saveSuccess) {
+        console.error('⚠️ [Alipay] 数据库保存失败 (不影响支付)')
+      } else {
+        console.log('✅ [Alipay] 订单已保存到数据库')
+      }
+    } catch (dbError) {
+      console.error('⚠️ [Alipay] 数据库操作异常 (不影响支付):', dbError)
+      console.error('⚠️ [Alipay] 错误详情:', {
+        message: dbError instanceof Error ? dbError.message : String(dbError),
+        stack: dbError instanceof Error ? dbError.stack : undefined,
+        userId,
+        IS_CHINA_DEPLOYMENT
+      })
     }
 
     // 返回支付链接

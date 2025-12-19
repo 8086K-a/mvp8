@@ -50,11 +50,11 @@ const nextConfig = {
   webpack: (config, { dev, isServer }) => {
     // 开发环境优化
     if (dev && !isServer) {
-      // 启用更快的热重载
-      config.watchOptions = {
-        poll: 1000,
-        aggregateTimeout: 300,
-      }
+      // 使用默认的文件系统事件监听器，避免轮询导致的频繁编译
+      // config.watchOptions = {
+      //   poll: 1000,
+      //   aggregateTimeout: 300,
+      // }
     }
 
     // 生产环境优化

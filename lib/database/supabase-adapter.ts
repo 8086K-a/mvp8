@@ -181,14 +181,85 @@ export class SupabaseAdapter {
         }, {
           onConflict: 'user_id'
         })
-      
+
       if (error) throw error
-      
+
       console.log('✅ [DB-Supabase] 更新订阅成功')
       return true
     } catch (error) {
       console.error('❌ [DB-Supabase] 更新订阅失败:', error)
       return false
+    }
+  }
+
+  // ==========================================
+  // 支付功能
+  // ==========================================
+
+  async savePaymentTransaction(transaction: any): Promise<boolean> {
+    try {
+      // Supabase字段结构
+      const supabaseTransaction = {
+        user_id: this.userId,
+        user_email: transaction.user_email,
+        plan_type: transaction.plan_type,
+        billing_cycle: transaction.billing_cycle,
+        amount_usd: transaction.amount_usd,
+        amount_cny: transaction.amount_cny,
+        payment_method: transaction.payment_method,
+        transaction_id: transaction.transaction_id,
+        status: transaction.status || 'pending'
+      }
+
+      const { error } = await supabase
+        .from(TABLES.PAYMENT_TRANSACTIONS)
+        .insert(supabaseTransaction)
+
+      if (error) throw error
+
+      console.log('✅ [DB-Supabase] 保存支付记录成功:', transaction.transaction_id)
+      return true
+    } catch (error) {
+      console.error('❌ [DB-Supabase] 保存支付记录失败:', error)
+      return false
+    }
+  }
+
+  async updatePaymentStatus(transactionId: string, status: string): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from(TABLES.PAYMENT_TRANSACTIONS)
+        .update({
+          status: status,
+          updated_at: new Date().toISOString()
+        })
+        .eq('transaction_id', transactionId)
+
+      if (error) throw error
+
+      console.log('✅ [DB-Supabase] 更新支付状态成功:', transactionId, status)
+      return true
+    } catch (error) {
+      console.error('❌ [DB-Supabase] 更新支付状态失败:', error)
+      return false
+    }
+  }
+
+  async getPaymentTransaction(transactionId: string): Promise<any | null> {
+    try {
+      const { data, error } = await supabase
+        .from(TABLES.PAYMENT_TRANSACTIONS)
+        .select('*')
+        .eq('transaction_id', transactionId)
+        .maybeSingle()
+
+      if (error) throw error
+
+      console.log('✅ [DB-Supabase] 获取支付记录:', data ? '找到' : '未找到')
+      return data
+    } catch (error) {
+      console.error('❌ [DB-Supabase] 获取支付记录失败:', error)
+      return null
     }
   }
 }

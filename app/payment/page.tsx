@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { useGeo } from '@/contexts/geo-context'
 import { useLanguage } from '@/contexts/language-context'
+import { useAuth } from '@/contexts/auth-context'
 import { Badge } from '@/components/ui/badge'
 import { paymentTranslationsZh } from '@/lib/i18n/payment-zh'
 import { paymentTranslationsEn } from '@/lib/i18n/payment-en'
@@ -20,6 +21,7 @@ export default function PaymentPage() {
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'stripe' | 'paypal' | 'alipay' | 'wechat'>('stripe')
   const { location, loading: geoLoading, isChina, isEurope } = useGeo()
   const { language } = useLanguage()
+  const { user } = useAuth()
   const t = language === 'zh' ? paymentTranslationsZh : paymentTranslationsEn
 
   // Europe blocking - GDPR compliance
@@ -278,14 +280,27 @@ export default function PaymentPage() {
           planType: selectedPlan,
           billingCycle: billingCycle,
           userEmail,
+          userId: user.id, // 添加用户ID
         }),
       })
 
       const data = await response.json()
 
       if (data.paymentUrl) {
-        // 跳转到支付宝支付页面
-        window.location.href = data.paymentUrl
+        // 支付宝返回的是HTML表单，需要插入页面并自动提交
+        const tempDiv = document.createElement('div')
+        tempDiv.innerHTML = data.paymentUrl
+        tempDiv.style.display = 'none'
+        document.body.appendChild(tempDiv)
+
+        // 找到表单并自动提交
+        const form = tempDiv.querySelector('form')
+        if (form) {
+          form.submit()
+        } else {
+          // 如果找不到表单，直接跳转（兼容其他情况）
+          window.location.href = data.paymentUrl
+        }
       } else {
         throw new Error(data.error || 'No payment URL received')
       }

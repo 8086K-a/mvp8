@@ -49,9 +49,9 @@ export default async function handler(
 
     // 初始化 CloudBase App 实例
     const app = cloudbase.init({
-      env: process.env.TENCENT_ENV_ID || process.env.NEXT_PUBLIC_WECHAT_CLOUDBASE_ID,
-      secretId: process.env.TENCENT_SECRET_ID || process.env.CLOUDBASE_SECRET_ID,
-      secretKey: process.env.TENCENT_SECRET_KEY || process.env.CLOUDBASE_SECRET_KEY
+      env: process.env.NEXT_PUBLIC_WECHAT_CLOUDBASE_ID,
+      secretId: process.env.CLOUDBASE_SECRET_ID,
+      secretKey: process.env.CLOUDBASE_SECRET_KEY
     })
 
     const db = app.database()
@@ -185,6 +185,24 @@ export default async function handler(
         
         console.log(`✅ [Login Success]: User ${email} logged in successfully`)
 
+        // 检查用户是否有活跃订阅
+        let hasActiveSubscription = user.pro || false
+        try {
+          const subscriptionCheck = await db.collection('web_subscriptions')
+            .where({
+              user_email: user.email,
+              status: 'active'
+            })
+            .get()
+
+          if (subscriptionCheck.data && subscriptionCheck.data.length > 0) {
+            hasActiveSubscription = true
+            console.log('✅ [Login] 用户有活跃订阅')
+          }
+        } catch (subError) {
+          console.warn('⚠️ [Login] 检查订阅状态失败:', subError)
+        }
+
         // 生成 JWT Token
         const tokenPayload = {
           userId: user._id,
@@ -193,7 +211,7 @@ export default async function handler(
         }
 
         // ✅ 动态设置 Token 有效期：普通用户 30 天，高级会员 90 天（多端持久化优化）
-        const expiresIn = user.pro ? '90d' : '30d'
+        const expiresIn = hasActiveSubscription ? '90d' : '30d'
 
         const token = jwt.sign(
           tokenPayload,
@@ -211,7 +229,7 @@ export default async function handler(
             userId: user._id, // 确保userId字段也存在（与JWT token中的userId一致）
             email: user.email,
             name: user.name,
-            pro: user.pro || false,
+            pro: hasActiveSubscription,
             region: 'china'
           },
           token: token // 返回 JWT Token
@@ -253,6 +271,24 @@ export default async function handler(
 
         const user = userResult.data[0]
 
+        // 检查用户是否有活跃订阅
+        let hasActiveSubscription = user.pro || user.is_pro || false
+        try {
+          const subscriptionCheck = await db.collection('web_subscriptions')
+            .where({
+              user_email: user.email,
+              status: 'active'
+            })
+            .get()
+
+          if (subscriptionCheck.data && subscriptionCheck.data.length > 0) {
+            hasActiveSubscription = true
+            console.log('✅ [Token Refresh] 用户有活跃订阅')
+          }
+        } catch (subError) {
+          console.warn('⚠️ [Token Refresh] 检查订阅状态失败:', subError)
+        }
+
         // 生成新的JWT Token
         const tokenPayload = {
           userId: user._id,
@@ -261,7 +297,7 @@ export default async function handler(
         }
 
         // ✅ 根据用户会员状态设置有效期
-        const expiresIn = user.pro ? '90d' : '30d'
+        const expiresIn = hasActiveSubscription ? '90d' : '30d'
 
         const newToken = jwt.sign(
           tokenPayload,
@@ -274,6 +310,14 @@ export default async function handler(
         return res.status(200).json({
           success: true,
           message: 'Token刷新成功',
+          user: {
+            id: user._id,
+            userId: user._id,
+            email: user.email,
+            name: user.name,
+            pro: hasActiveSubscription,
+            region: 'china'
+          },
           token: newToken,
           expiresIn: expiresIn
         })

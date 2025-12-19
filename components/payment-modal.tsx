@@ -196,8 +196,44 @@ export function PaymentModal({ open, onOpenChange, onSuccess }: PaymentModalProp
         setLoading(false)
       } else if (selectedPaymentMethod === 'alipay') {
         // 支付宝支付流程
-        setError("Alipay payment is under development")
-        setLoading(false)
+        const response = await fetch('/api/payment/alipay/create', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            planType,
+            billingCycle,
+            userEmail: user.email,
+            userId: user.id,
+          }),
+        })
+
+        const data = await response.json()
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to create Alipay payment')
+        }
+
+        // 支付宝返回的是HTML表单，需要插入页面并自动提交
+        if (data.paymentUrl) {
+          // 创建一个临时的div来存放支付宝表单
+          const tempDiv = document.createElement('div')
+          tempDiv.innerHTML = data.paymentUrl
+          tempDiv.style.display = 'none'
+          document.body.appendChild(tempDiv)
+
+          // 找到表单并自动提交
+          const form = tempDiv.querySelector('form')
+          if (form) {
+            form.submit()
+          } else {
+            // 如果找不到表单，直接跳转（兼容其他情况）
+            window.location.href = data.paymentUrl
+          }
+        } else {
+          throw new Error('No payment form received')
+        }
       } else {
         setError("Unsupported payment method")
         setLoading(false)
