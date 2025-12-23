@@ -123,20 +123,10 @@ export async function GET(req: NextRequest) {
               if (subSuccess) {
                 console.log('✅ [Alipay Verify] CloudBase订阅已激活')
 
-                // 更新用户记录的pro状态
-                try {
-                  const cloudbaseDB = await userAdapter.getDb()
-                  if (cloudbaseDB) {
-                    await cloudbaseDB.collection('web_users')
-                      .where({ _id: userId })
-                      .update({
-                        is_pro: true,
-                        updated_at: new Date().toISOString()
-                      })
-                    console.log('✅ [Alipay Verify] 用户pro状态已更新')
-                  }
-                } catch (updateError) {
-                  console.error('❌ [Alipay Verify] 更新用户pro状态失败:', updateError)
+                // ✅ 使用适配器更新用户 Pro 状态
+                const proUpdateSuccess = await userAdapter.setUserProStatus(true)
+                if (proUpdateSuccess) {
+                  console.log('✅ [Alipay Verify] 用户 Pro 状态已更新')
                 }
               } else {
                 console.error('❌ [Alipay Verify] CloudBase订阅创建失败')

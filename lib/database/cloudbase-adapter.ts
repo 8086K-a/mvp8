@@ -420,15 +420,15 @@ export class CloudBaseAdapter {
           .doc(existing._id)
           .update({
             ...subscription,
-            updated_at: new Date()
+            updated_at: new Date().toISOString()
           })
       } else {
         // 创建新订阅
         await database.collection(COLLECTIONS.SUBSCRIPTIONS).add({
           user_id: this.userId,
           ...subscription,
-          created_at: new Date(),
-          updated_at: new Date()
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
         })
       }
 
@@ -436,6 +436,41 @@ export class CloudBaseAdapter {
       return true
     } catch (error) {
       console.error('❌ [DB-腾讯云] 更新订阅失败:', error)
+      return false
+    }
+  }
+
+  /**
+   * 更新用户的 Pro 会员状态
+   */
+  async setUserProStatus(isPro: boolean): Promise<boolean> {
+    // 客户端环境不支持数据库操作
+    if (typeof window !== 'undefined') {
+      console.warn('⚠️ [DB-腾讯云] 客户端不支持数据库操作')
+      return false
+    }
+
+    try {
+      const database = this.getDb()
+      if (!database) {
+        console.warn('⚠️ [DB-腾讯云] 数据库未初始化')
+        return false
+      }
+
+      console.log(`🔄 [DB-腾讯云] 更新用户 ${this.userId} 的 Pro 状态为: ${isPro}`)
+
+      await database.collection(COLLECTIONS.USERS)
+        .doc(this.userId)
+        .update({
+          pro: isPro,
+          is_pro: isPro,
+          updated_at: new Date().toISOString()
+        })
+
+      console.log('✅ [DB-腾讯云] 用户 Pro 状态更新成功')
+      return true
+    } catch (error) {
+      console.error('❌ [DB-腾讯云] 更新用户 Pro 状态失败:', error)
       return false
     }
   }

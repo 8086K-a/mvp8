@@ -962,7 +962,7 @@ export default function SettingsPage() {
   const [legalDialogOpen, setLegalDialogOpen] = useState(false)
   const [selectedLegal, setSelectedLegal] = useState<LegalDocumentKey | null>(null)
 
-  const isAuthenticated = user?.type === "authenticated" && !!supabaseUser
+  const isAuthenticated = user?.type === "authenticated"
   const userEmail = supabaseUser?.email ?? user?.email ?? ""
 
   // determineLocale keeps UI language consistent // determineLocale 负责保持界面语言一致
@@ -1242,7 +1242,7 @@ export default function SettingsPage() {
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-slate-400">{currentLanguage === "zh" ? "用户 ID" : "User ID"}</span>
                       <span className="font-mono text-slate-300">
-                        {supabaseUser?.id?.slice(0, 8)}…
+                        {(supabaseUser?.id || user?.id)?.slice(0, 8)}…
                       </span>
                     </div>
                     <div className="flex items-center justify-between text-sm">

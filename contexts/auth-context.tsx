@@ -1,7 +1,7 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState, useRef } from 'react'
-import { User as SupabaseUser, Session } from '@supabase/supabase-js'
+import { User as SupabaseUser, Session, AuthChangeEvent } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { sessionManager } from '@/lib/session-manager'
 import { AuthTokenManager } from '@/lib/auth-token-manager'
@@ -86,6 +86,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
             setUser(customUser)
             localStorage.setItem("sitehub-user", JSON.stringify(customUser))
+            // ✅ 恢复会话成功，清除访客计时
+            localStorage.removeItem("guest-start-time")
             setLoading(false)
             return
           } catch (error) {
@@ -146,7 +148,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      async (event: AuthChangeEvent, session: Session | null) => {
         console.log("Auth state change:", event, session?.user?.email)
         
         // ✅ 关键修复：只在组件仍挂载时处理状态更新
@@ -180,6 +182,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               return customUser
             })
             localStorage.setItem("sitehub-user", JSON.stringify(customUser))
+            // ✅ 登录成功，清除访客计时
+            localStorage.removeItem("guest-start-time")
           } else if (event === 'SIGNED_OUT') {
             setUser(prev => {
               if (prev.type === "guest") return prev
@@ -222,19 +226,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const signOut = async () => {
-    sessionManager.clearSession()
-    
-    // ✅ 清除 JWT Token 相关数据
-    localStorage.removeItem('user_token')
-    localStorage.removeItem('user_info')
-    console.log('✅ [Logout]: JWT token cleared')
-    
-    await supabase.auth.signOut()
+    try {
+      sessionManager.clearSession()
+      
+      // ✅ 1. 清除所有持久化存储
+      localStorage.removeItem('user_token')
+      localStorage.removeItem('user_info')
+      localStorage.removeItem('sitehub-user')
+      
+      // ✅ 2. 立即更新本地状态，不依赖监听器
+      setUser({ type: "guest", customCount: 0, pro: false })
+      setSupabaseUser(null)
+      setSession(null)
+      
+      console.log('✅ [Logout]: All auth data cleared')
+      
+      // ✅ 3. 调用 Supabase 退出（如果是 Supabase 用户）
+      await supabase.auth.signOut()
+    } catch (error) {
+      console.error("Error during sign out:", error)
+      // 即使报错也强制重置状态
+      setUser({ type: "guest", customCount: 0, pro: false })
+    }
   }
 
   const signIn = (userData: CustomUser) => {
     setUser(userData)
     localStorage.setItem("sitehub-user", JSON.stringify(userData))
+    // ✅ 登录成功，清除访客计时
+    localStorage.removeItem("guest-start-time")
   }
 
   const value = {

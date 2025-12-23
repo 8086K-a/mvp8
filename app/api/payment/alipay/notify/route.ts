@@ -13,6 +13,7 @@ const alipayConfig = {
   signType: 'RSA2',
   charset: 'utf-8',
   version: '1.0',
+  camelcase: false, // ✅ 必须设置为 false，否则签名验证会因为字段名转换失败
 }
 
 // 地区检测
@@ -67,47 +68,39 @@ export async function POST(req: NextRequest) {
       trade_no, // 支付宝交易号
       trade_status, // 交易状态
       total_amount, // 订单金额
-      passback_params, // ✅ 从 passback_params 获取用户邮箱（创建订单时传递）
+      passback_params, // ✅ 从 passback_params 获取用户ID（创建订单时传递的是userId）
     } = params
     
-    // 从 passback_params 提取 userEmail（如果存在）
-    const userEmail = passback_params || ''
+    // 从 passback_params 提取 userId（如果存在）
+    const passbackUserId = passback_params || ''
 
     // 更新数据库订单状态
     if (trade_status === 'TRADE_SUCCESS' || trade_status === 'TRADE_FINISHED') {
       console.log('💰 [Alipay Notify] 支付成功，更新订单状态')
 
       let transaction: any = null
-      let finalUserEmail = userEmail
-      let userId = ''
+      let finalUserEmail = ''
+      let userId = passbackUserId
 
       try {
         if (IS_CHINA_DEPLOYMENT) {
           // CloudBase逻辑：需要先查询订单获取用户信息
-          console.log('🔍 [Alipay Notify] 开始查询CloudBase订单记录...')
-          const cloudbaseAdapter = new CloudBaseAdapter('temp_user') // 使用临时userId进行查询
+          console.log('🔍 [Alipay Notify] 开始查询CloudBase订单记录...', { out_trade_no })
+          const cloudbaseAdapter = new CloudBaseAdapter(userId || 'temp_user') 
           transaction = await cloudbaseAdapter.getPaymentTransaction(out_trade_no)
 
           console.log('📊 [Alipay Notify] 查询结果:', transaction ? '找到订单' : '未找到订单')
 
           if (!transaction) {
             console.error('❌ [Alipay Notify] CloudBase未找到订单记录:', out_trade_no)
-            return new NextResponse('success', {
-              status: 200,
-              headers: { 'Content-Type': 'text/plain' },
-            })
+            // 如果没找到订单，但有 passbackUserId，我们仍然可以尝试创建订阅
+            if (!userId) {
+              return new NextResponse('success', { status: 200 })
+            }
+          } else {
+            userId = transaction.user_id || userId
+            finalUserEmail = transaction.user_email || ''
           }
-
-          console.log('📋 [Alipay Notify] 订单详情:', {
-            user_id: transaction.user_id,
-            plan_type: transaction.plan_type,
-            payment_status: transaction.payment_status,
-            transaction_id: transaction.transaction_id
-          })
-
-          userId = transaction.user_id
-          // CloudBase中可能没有直接的邮箱，需要从用户信息中获取
-          finalUserEmail = transaction.user_email || userEmail
         } else {
           // Supabase逻辑
           const supabaseAdapter = new SupabaseAdapter('')
@@ -121,8 +114,8 @@ export async function POST(req: NextRequest) {
             })
           }
 
-          finalUserEmail = transaction.user_email || userEmail
-          userId = transaction.user_id
+          finalUserEmail = transaction.user_email || ''
+          userId = transaction.user_id || passbackUserId
         }
 
         console.log('📦 [Alipay Notify] 订单信息:', {
@@ -203,6 +196,14 @@ export async function POST(req: NextRequest) {
             console.error('❌ [Alipay Notify] CloudBase订阅更新失败')
           } else {
             console.log('✅ [Alipay Notify] CloudBase用户订阅已激活')
+            
+            // ✅ 关键修复：更新用户的 pro 状态
+            const proUpdateSuccess = await cloudbaseAdapter.setUserProStatus(true)
+            if (proUpdateSuccess) {
+              console.log('✅ [Alipay Notify] CloudBase用户 Pro 状态已更新')
+            } else {
+              console.error('❌ [Alipay Notify] CloudBase用户 Pro 状态更新失败')
+            }
           }
         } else {
           const supabaseAdapter = new SupabaseAdapter(userId)

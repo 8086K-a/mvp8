@@ -9,18 +9,19 @@ import { homeUiText } from "@/lib/i18n/home-ui"
 
 interface GuestTimerProps {
   user: any
+  loading?: boolean
   onTimeExpired: () => void
   onUpgradeClick: () => void
 }
 
-export function GuestTimer({ user, onTimeExpired, onUpgradeClick }: GuestTimerProps) {
+export function GuestTimer({ user, loading, onTimeExpired, onUpgradeClick }: GuestTimerProps) {
   const [timeRemaining, setTimeRemaining] = useState(600) // 10 minutes in seconds
   const [isExpired, setIsExpired] = useState(false)
   const { language } = useLanguage()
   const text = homeUiText[language].guestTimer
 
   useEffect(() => {
-    if (user.type !== "guest") return
+    if (user.type !== "guest" || loading) return
 
     // Get start time from localStorage or set it now
     const startTime = localStorage.getItem("guest-start-time")

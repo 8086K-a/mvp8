@@ -577,7 +577,7 @@ export default function SiteHub() {
     }
 
     // Check if guest time is already expired
-    if (user.type === "guest" && isHydrated && typeof window !== 'undefined') {
+    if (!authLoading && user.type === "guest" && isHydrated && typeof window !== 'undefined') {
       const startTime = localStorage.getItem("guest-start-time")
       if (startTime) {
         try {
@@ -878,10 +878,10 @@ export default function SiteHub() {
           nameEn: newSite.name,
           custom: true,
           featured: false,
-          isChina: false,
+          isChina: isChina,
         }
 
-        setSites((prev) => [...prev, siteWithId])
+        setRawSites((prev) => [...prev, siteWithId])
 
         // 添加到收藏
         if (isChina) {
@@ -909,7 +909,7 @@ export default function SiteHub() {
         nameEn: newSite.name,
         custom: true,
         category: "tools",
-        isChina: false,
+        isChina: isChina,
       }
 
       // ✅ 性能优化：直接设置原始数据
@@ -1102,7 +1102,11 @@ export default function SiteHub() {
   const handleCloseAuthModal = useCallback(() => setShowAuthModal(false), [])
   const handleAuthSuccess = useCallback((userData: any) => {
     console.log('🔍 [Auth] 用户认证成功:', userData)
+    setIsGuestTimeExpired(false)
     setShowAuthModal(false)
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem("guest-start-time")
+    }
   }, [])
 
   // 拖拽处理

@@ -95,7 +95,7 @@ export function Header({ onGuestTimeExpired, onUpgradeClick }: HeaderProps) {
 
           {/* User Menu */}
           <div className="flex items-center gap-2 sm:gap-4">
-            <GuestTimer user={user} onTimeExpired={onGuestTimeExpired} onUpgradeClick={onUpgradeClick} />
+            <GuestTimer user={user} loading={loading} onTimeExpired={onGuestTimeExpired} onUpgradeClick={onUpgradeClick} />
 
             <DownloadButtons compact />
 
